@@ -1,0 +1,2835 @@
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 1
+
+0000                         1  *#cpu 8051 Tiny
+0000                         2  *
+0000                         3  * DDS MICRO-C 8031/51 Startup Code & Runtime library for *TINY model
+0000                         4  *
+0000                         5  * Copyright 1991-1999 Dave Dunfield
+0000                         6  * All rights reserved.
+0000                         7  *
+0000                         8    ORG $0   ROM Starts here
+0000  01 34                  9    AJMP START
+0002                        10  
+0002                        11  
+0002                        12  * put interrupt vector here
+0002                        13  
+000B                        14    ORG $B        Vector for Timer 0 interrupt
+000B  02 00 48              15    LJMP servicetimer0
+000E                        16         
+000E                        17  * Fixed memory locations for alternate access to the R0-R7 register bank.
+000E                        18  * If you are NOT useing BANK 0, these equates must be adjusted.
+0000                        19  ?R0	EQU	0		Used for "POP" from stack
+0001                        20  ?R1	EQU	?R0+1		Used to load index indirectly
+0002                        21  ?R2	EQU	?R0+2		""		""		""		""
+0003                        22  ?R3	EQU	?R0+3		Used by some runtime lib functions
+0004                        23  ?R4	EQU	?R0+4
+0005                        24  ?R5	EQU	?R0+5
+0006                        25  ?R6	EQU	?R0+6
+0007                        26  ?R7	EQU	?R0+7
+000E                        27  *
+000E                        28  * Startup code entry point
+000E                        29  *
+000E                        30  * If you are NOT using interrupts, you can reclaim 50 bytes
+000E                        31  * of code space by removing the following TWO lines.
+000E                        32  *    AJMP    *+$0032     Skip interrupt vectors
+000E                        33  *    DS      $0032-2     Reserve space for interrupt vectors
+000E                        34  
+0034                        35         org $34
+0034                        36  
+0034                        37  START   EQU     *
+0034  75 81 51              38  	MOV	SP,#?stk-1	Set up initial stack
+0037  75 89 01              39          MOV  TMOD,#1
+003A  D2 AF                 40  	SETB IE.7               set bit  EA
+003C  D2 A9                 41          SETB IE.1               set bit  ET0 Enable timer 0 interrupt
+003E  D2 8C                 42          SETB TCON.4             start timer 0
+0040  12 00 55              43      	LCALL	main		Execute program
+0043                        44          
+0043                        45  * EXIT to MON51 by calling the 'timer1' interrupt vector ($001B).
+0043                        46  * This causes MON51 to think that a single-step operation has just
+0043                        47  * completed, and therefore it saves the user registers, and performs
+0043                        48  * a context switch back to the monitor.
+0043                        49  *
+0043                        50  * When using 2K addressing (CC51: -Z option, ASM51: -A option) this LCALL
+0043                        51  * may fail "Out of range" because it gets translated to ACALL, and $001B
+0043                        52  * may not be in the same 2K block as your program. Since 2K devices cannot
+0043                        53  * support a debugger, change the ORG to $0000, and ...<continue below>...
+0043                        54  *
+0043                        55  * If you are NOT using MON51 (or MONICA which works the same), you will
+0043                        56  * need to change this to whatever action you desire when main() returns.
+0043                        57  * Suggestions: 1:freeze (SJMP *) 2:Restart (SJMP *&$FF00)
+0043  12 00 1B              58  exit	LCALL	$001B		Call Timer-1 interrupt
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 2
+
+0046  80 FB                 59  	SJMP	exit		Incase he go's again
+0048                        60  
+0048                        61  **************************** My code *********************************
+0048                        62                                       
+0048                        63  servicetimer0   EQU *
+0048  C2 8C                 64     CLR  TCON.4      clear bit TR0
+004A  43 8C D8              65     ORL  TH0,#$D8      reload timer 0 for 10 ms
+004D  43 8A F0              66     ORL  TL0,#$F0 
+0050  05 08                 67     INC  tick
+0052  D2 8C                 68     SETB TCON.4     set bit TR0
+0054  32                    69     RETI
+0055                        70  
+0055                        71  main EQU *
+0055  74 64                 72   MOV A,#100
+0057  75 F0 00              73   MOV B,#0
+005A  C0 E0                 74   PUSH A
+005C  C0 F0                 75   PUSH B
+005E  12 10 C6              76   LCALL delay
+0061  15 81                 77   DEC SP
+0063  15 81                 78   DEC SP
+0065  C2 B3                 79   CLR P3.3
+0067  74 00                 80   MOV A,#0
+0069  75 F0 00              81   MOV B,#0
+006C  F5 09                 82   MOV i,A
+006E  85 F0 0A              83   MOV i+1,B
+0071  74 00                 84   MOV A,#0
+0073  75 F0 00              85   MOV B,#0
+0076  F5 17                 86   MOV count,A
+0078  85 F0 18              87   MOV count+1,B
+007B  74 80                 88   MOV A,#128
+007D  75 F0 25              89   MOV B,#37
+0080  C0 E0                 90   PUSH A
+0082  C0 F0                 91   PUSH B
+0084  12 10 E3              92   LCALL serinit
+0087  15 81                 93   DEC SP
+0089  15 81                 94   DEC SP
+008B  12 11 32              95   LCALL getch
+008E  79 46                 96   MOV R1,#title
+0090  7A 13                 97   MOV R2,#=title
+0092  E9                    98   MOV A,R1
+0093  8A F0                 99   MOV B,R2
+0095  C0 E0                100   PUSH A
+0097  C0 F0                101   PUSH B
+0099  12 11 06             102   LCALL putstr
+009C  15 81                103   DEC SP
+009E  15 81                104   DEC SP
+00A0  12 02 1E             105   LCALL sendprompt
+00A3  D2 B2                106   SETB P3.2
+00A5  74 64                107   MOV A,#100
+00A7  75 F0 00             108   MOV B,#0
+00AA  C0 E0                109   PUSH A
+00AC  C0 F0                110   PUSH B
+00AE  12 10 C6             111   LCALL delay
+00B1  15 81                112   DEC SP
+00B3  15 81                113   DEC SP
+00B5                       114  ?AB1 EQU *
+00B5  12 01 B9             115   LCALL getcommand
+00B8  12 02 31             116   LCALL prompting
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 3
+
+00BB  12 0C ED             117   LCALL setcounter
+00BE  12 06 E0             118   LCALL erase
+00C1  12 07 9E             119   LCALL write
+00C4  12 08 CC             120   LCALL read
+00C7  12 0A 30             121   LCALL lock
+00CA  12 0B 14             122   LCALL printchksum
+00CD  12 0D 0D             123   LCALL getinfo
+00D0  12 0D D8             124   LCALL PGMparameters
+00D3  12 06 42             125   LCALL read_ID
+00D6  12 06 60             126   LCALL block_select
+00D9  12 06 03             127   LCALL manual_VPP
+00DC  12 05 A3             128   LCALL read_lockbit
+00DF  12 0E 3E             129   LCALL printhelp
+00E2  12 03 2B             130   LCALL get_record
+00E5  02 00 B5             131   LJMP ?AB1
+00E8                       132  ?AB2 EQU *
+00E8  22                   133   RET
+00E9  7F 09                134  getnum MOV R7,#9
+00EB  12 11 E6             135   LCALL ?adjstk
+00EE  74 00                136   MOV A,#0
+00F0  78 FC                137   MOV R0,#-4
+00F2  12 11 DA             138   LCALL ?auto0
+00F5  F6                   139   MOV [R0],A
+00F6  74 00                140   MOV A,#0
+00F8  75 F0 00             141   MOV B,#0
+00FB  08                   142   INC R0
+00FC  F6                   143   MOV [R0],A
+00FD  08                   144   INC R0
+00FE  A6 F0                145   MOV [R0],B
+0100                       146  ?AB3 EQU *
+0100  78 FC                147   MOV R0,#-4
+0102  12 11 DA             148   LCALL ?auto0
+0105  E6                   149   MOV A,[R0]
+0106  12 12 0C             150   LCALL ?sign
+0109  7B 0A                151   MOV R3,#10
+010B  12 12 03             152   LCALL ?tsign
+010E  12 12 E7             153   LCALL ?ne
+0111  45 F0                154   ORL A,B
+0113  70 03                155   JNZ ?AB5
+0115  02 01 6B             156   LJMP ?AB4
+0118                       157  ?AB5 EQU *
+0118  80 16                158   SJMP ?AB6
+011A                       159  ?AB7 EQU *
+011A  78 FD                160   MOV R0,#-3
+011C  12 11 DA             161   LCALL ?auto0
+011F  E6                   162   MOV A,[R0]
+0120  08                   163   INC R0
+0121  86 F0                164   MOV B,[R0]
+0123  12 12 A4             165   LCALL ?inc
+0126  18                   166   DEC R0
+0127  F6                   167   MOV [R0],A
+0128  08                   168   INC R0
+0129  A6 F0                169   MOV [R0],B
+012B  12 12 AD             170   LCALL ?dec
+012E  80 D0                171   SJMP ?AB3
+0130                       172  ?AB6 EQU *
+0130  74 11                173   MOV A,#17
+0132  75 F0 00             174   MOV B,#0
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 4
+
+0135  C0 E0                175   PUSH A
+0137  C0 F0                176   PUSH B
+0139  12 11 1A             177   LCALL putch
+013C  15 81                178   DEC SP
+013E  15 81                179   DEC SP
+0140  12 11 32             180   LCALL getch
+0143  C0 E0                181   PUSH A
+0145  C0 F0                182   PUSH B
+0147  12 11 42             183   LCALL putchr
+014A  15 81                184   DEC SP
+014C  15 81                185   DEC SP
+014E  78 FC                186   MOV R0,#-4
+0150  12 11 DA             187   LCALL ?auto0
+0153  F6                   188   MOV [R0],A
+0154  08                   189   INC R0
+0155  E6                   190   MOV A,[R0]
+0156  08                   191   INC R0
+0157  86 F0                192   MOV B,[R0]
+0159  79 F6                193   MOV R1,#-10
+015B  12 11 DF             194   LCALL ?auto1
+015E  12 11 FC             195   LCALL ?addi
+0161  78 FC                196   MOV R0,#-4
+0163  12 11 DA             197   LCALL ?auto0
+0166  E6                   198   MOV A,[R0]
+0167  F7                   199   MOV [R1],A
+0168  02 01 1A             200   LJMP ?AB7
+016B                       201  ?AB4 EQU *
+016B  78 FD                202   MOV R0,#-3
+016D  12 11 DA             203   LCALL ?auto0
+0170  E6                   204   MOV A,[R0]
+0171  08                   205   INC R0
+0172  86 F0                206   MOV B,[R0]
+0174  79 F6                207   MOV R1,#-10
+0176  12 11 DF             208   LCALL ?auto1
+0179  12 11 FC             209   LCALL ?addi
+017C  74 00                210   MOV A,#0
+017E  F7                   211   MOV [R1],A
+017F  78 FD                212   MOV R0,#-3
+0181  12 11 DA             213   LCALL ?auto0
+0184  E6                   214   MOV A,[R0]
+0185  08                   215   INC R0
+0186  86 F0                216   MOV B,[R0]
+0188  7B 00                217   MOV R3,#0
+018A  7C 00                218   MOV R4,#0
+018C  12 12 DE             219   LCALL ?eq
+018F  45 F0                220   ORL A,B
+0191  70 03                221   JNZ ?AB9
+0193  02 01 9E             222   LJMP ?AB8
+0196                       223  ?AB9 EQU *
+0196  74 FF                224   MOV A,#255
+0198  75 F0 FF             225   MOV B,#255
+019B  02 01 B4             226   LJMP ?AB10
+019E                       227  ?AB8 EQU *
+019E  79 F6                228   MOV R1,#-10
+01A0  12 11 DF             229   LCALL ?auto1
+01A3  E9                   230   MOV A,R1
+01A4  8A F0                231   MOV B,R2
+01A6  C0 E0                232   PUSH A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 5
+
+01A8  C0 F0                233   PUSH B
+01AA  12 11 62             234   LCALL _atoi
+01AD  15 81                235   DEC SP
+01AF  15 81                236   DEC SP
+01B1  02 01 B4             237   LJMP ?AB10
+01B4                       238  ?AB11 EQU *
+01B4                       239  ?AB10 EQU *
+01B4  7F F7                240   MOV R7,#-9
+01B6  02 11 F5             241   LJMP ?exit
+01B9                       242  getcommand EQU *
+01B9  E5 98                243   MOV A,SCON
+01BB  54 01                244   ANL A,#1
+01BD  75 F0 00             245   MOV B,#0
+01C0  7B 00                246   MOV R3,#0
+01C2  7C 00                247   MOV R4,#0
+01C4  12 12 E7             248   LCALL ?ne
+01C7  45 F0                249   ORL A,B
+01C9  70 03                250   JNZ ?AB13
+01CB  02 01 E1             251   LJMP ?AB12
+01CE                       252  ?AB13 EQU *
+01CE  12 11 32             253   LCALL getch
+01D1  C0 E0                254   PUSH A
+01D3  C0 F0                255   PUSH B
+01D5  12 11 42             256   LCALL putchr
+01D8  15 81                257   DEC SP
+01DA  15 81                258   DEC SP
+01DC  F5 12                259   MOV command,A
+01DE  02 01 E5             260   LJMP ?AB14
+01E1                       261  ?AB12 EQU *
+01E1  74 FF                262   MOV A,#255
+01E3  F5 12                263   MOV command,A
+01E5                       264  ?AB14 EQU *
+01E5  22                   265   RET
+01E6                       266  getconsole EQU *
+01E6  E5 98                267   MOV A,SCON
+01E8  54 01                268   ANL A,#1
+01EA  75 F0 00             269   MOV B,#0
+01ED  7B 00                270   MOV R3,#0
+01EF  7C 00                271   MOV R4,#0
+01F1  12 12 E7             272   LCALL ?ne
+01F4  45 F0                273   ORL A,B
+01F6  70 03                274   JNZ ?AB16
+01F8  02 02 03             275   LJMP ?AB15
+01FB                       276  ?AB16 EQU *
+01FB  12 11 57             277   LCALL getchr
+01FE  F5 12                278   MOV command,A
+0200  02 02 07             279   LJMP ?AB17
+0203                       280  ?AB15 EQU *
+0203  74 FF                281   MOV A,#255
+0205  F5 12                282   MOV command,A
+0207                       283  ?AB17 EQU *
+0207  22                   284   RET
+0208                       285  putok EQU *
+0208  79 80                286   MOV R1,#ok
+020A  7A 13                287   MOV R2,#=ok
+020C  E9                   288   MOV A,R1
+020D  8A F0                289   MOV B,R2
+020F  C0 E0                290   PUSH A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 6
+
+0211  C0 F0                291   PUSH B
+0213  12 11 06             292   LCALL putstr
+0216  15 81                293   DEC SP
+0218  15 81                294   DEC SP
+021A  12 02 1E             295   LCALL sendprompt
+021D  22                   296   RET
+021E                       297  sendprompt EQU *
+021E  79 7C                298   MOV R1,#prompt
+0220  7A 13                299   MOV R2,#=prompt
+0222  E9                   300   MOV A,R1
+0223  8A F0                301   MOV B,R2
+0225  C0 E0                302   PUSH A
+0227  C0 F0                303   PUSH B
+0229  12 11 06             304   LCALL putstr
+022C  15 81                305   DEC SP
+022E  15 81                306   DEC SP
+0230  22                   307   RET
+0231                       308  prompting EQU *
+0231  E5 12                309   MOV A,command
+0233  12 12 0C             310   LCALL ?sign
+0236  7B 0A                311   MOV R3,#10
+0238  12 12 03             312   LCALL ?tsign
+023B  12 12 DE             313   LCALL ?eq
+023E  45 F0                314   ORL A,B
+0240  70 03                315   JNZ ?AB19
+0242  02 02 5A             316   LJMP ?AB18
+0245                       317  ?AB19 EQU *
+0245  79 46                318   MOV R1,#title
+0247  7A 13                319   MOV R2,#=title
+0249  E9                   320   MOV A,R1
+024A  8A F0                321   MOV B,R2
+024C  C0 E0                322   PUSH A
+024E  C0 F0                323   PUSH B
+0250  12 11 06             324   LCALL putstr
+0253  15 81                325   DEC SP
+0255  15 81                326   DEC SP
+0257  12 02 1E             327   LCALL sendprompt
+025A                       328  ?AB18 EQU *
+025A  22                   329   RET
+025B  05 81                330  gets INC SP
+025D  74 00                331   MOV A,#0
+025F  75 F0 00             332   MOV B,#0
+0262  F5 09                333   MOV i,A
+0264  85 F0 0A             334   MOV i+1,B
+0267                       335  ?AB20 EQU *
+0267  78 FE                336   MOV R0,#-2
+0269  12 11 DA             337   LCALL ?auto0
+026C  E6                   338   MOV A,[R0]
+026D  12 12 0C             339   LCALL ?sign
+0270  7B 0A                340   MOV R3,#10
+0272  12 12 03             341   LCALL ?tsign
+0275  12 12 E7             342   LCALL ?ne
+0278  45 F0                343   ORL A,B
+027A  70 03                344   JNZ ?AB22
+027C  02 02 B2             345   LJMP ?AB21
+027F                       346  ?AB22 EQU *
+027F  80 12                347   SJMP ?AB23
+0281                       348  ?AB24 EQU *
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 7
+
+0281  E5 09                349   MOV A,i
+0283  85 0A F0             350   MOV B,i+1
+0286  12 12 A4             351   LCALL ?inc
+0289  F5 09                352   MOV i,A
+028B  85 F0 0A             353   MOV i+1,B
+028E  12 12 AD             354   LCALL ?dec
+0291  80 D4                355   SJMP ?AB20
+0293                       356  ?AB23 EQU *
+0293  12 11 32             357   LCALL getch
+0296  78 FE                358   MOV R0,#-2
+0298  12 11 DA             359   LCALL ?auto0
+029B  F6                   360   MOV [R0],A
+029C  E5 09                361   MOV A,i
+029E  85 0A F0             362   MOV B,i+1
+02A1  79 1F                363   MOV R1,#buffer
+02A3  7A 00                364   MOV R2,#=buffer
+02A5  12 11 FC             365   LCALL ?addi
+02A8  78 FE                366   MOV R0,#-2
+02AA  12 11 DA             367   LCALL ?auto0
+02AD  E6                   368   MOV A,[R0]
+02AE  F7                   369   MOV [R1],A
+02AF  02 02 81             370   LJMP ?AB24
+02B2                       371  ?AB21 EQU *
+02B2  E5 09                372   MOV A,i
+02B4  85 0A F0             373   MOV B,i+1
+02B7  79 1F                374   MOV R1,#buffer
+02B9  7A 00                375   MOV R2,#=buffer
+02BB  12 11 FC             376   LCALL ?addi
+02BE  74 00                377   MOV A,#0
+02C0  F7                   378   MOV [R1],A
+02C1  15 81                379   DEC SP
+02C3  22                   380   RET
+02C4                       381  to_hex EQU *
+02C4  78 F9                382   MOV R0,#-7
+02C6  12 11 DA             383   LCALL ?auto0
+02C9  E6                   384   MOV A,[R0]
+02CA  C3                   385   CLR C
+02CB  94 30                386   SUBB A,#48
+02CD  F5 0C                387   MOV temp,A
+02CF  E5 0C                388   MOV A,temp
+02D1  75 F0 00             389   MOV B,#0
+02D4  7B 09                390   MOV R3,#9
+02D6  7C 00                391   MOV R4,#0
+02D8  12 13 01             392   LCALL ?ugt
+02DB  45 F0                393   ORL A,B
+02DD  70 03                394   JNZ ?AB26
+02DF  02 02 E9             395   LJMP ?AB25
+02E2                       396  ?AB26 EQU *
+02E2  E5 0C                397   MOV A,temp
+02E4  C3                   398   CLR C
+02E5  94 07                399   SUBB A,#7
+02E7  F5 0C                400   MOV temp,A
+02E9                       401  ?AB25 EQU *
+02E9  E5 0C                402   MOV A,temp
+02EB  75 F0 00             403   MOV B,#0
+02EE  7B 04                404   MOV R3,#4
+02F0  7C 00                405   MOV R4,#0
+02F2  12 12 85             406   LCALL ?shl
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 8
+
+02F5  F5 0C                407   MOV temp,A
+02F7  78 F9                408   MOV R0,#-7
+02F9  12 11 DA             409   LCALL ?auto0
+02FC  F6                   410   MOV [R0],A
+02FD  08                   411   INC R0
+02FE  08                   412   INC R0
+02FF  E6                   413   MOV A,[R0]
+0300  C3                   414   CLR C
+0301  94 30                415   SUBB A,#48
+0303  F5 0C                416   MOV temp,A
+0305  E5 0C                417   MOV A,temp
+0307  75 F0 00             418   MOV B,#0
+030A  7B 09                419   MOV R3,#9
+030C  7C 00                420   MOV R4,#0
+030E  12 13 01             421   LCALL ?ugt
+0311  45 F0                422   ORL A,B
+0313  70 03                423   JNZ ?AB28
+0315  02 03 1F             424   LJMP ?AB27
+0318                       425  ?AB28 EQU *
+0318  E5 0C                426   MOV A,temp
+031A  C3                   427   CLR C
+031B  94 07                428   SUBB A,#7
+031D  F5 0C                429   MOV temp,A
+031F                       430  ?AB27 EQU *
+031F  78 F9                431   MOV R0,#-7
+0321  12 11 DA             432   LCALL ?auto0
+0324  E6                   433   MOV A,[R0]
+0325  45 0C                434   ORL A,temp
+0327  75 F0 00             435   MOV B,#0
+032A                       436  ?AB29 EQU *
+032A  22                   437   RET
+032B                       438  get_record EQU *
+032B  E5 12                439   MOV A,command
+032D  12 12 0C             440   LCALL ?sign
+0330  7B 68                441   MOV R3,#104
+0332  12 12 03             442   LCALL ?tsign
+0335  12 12 DE             443   LCALL ?eq
+0338  45 F0                444   ORL A,B
+033A  70 03                445   JNZ ?AB31
+033C  02 05 A2             446   LJMP ?AB30
+033F                       447  ?AB31 EQU *
+033F  74 85                448   MOV A,#?AB0+0&255
+0341  75 F0 13             449   MOV B,#?AB0+0/256
+0344  C0 E0                450   PUSH A
+0346  C0 F0                451   PUSH B
+0348  12 11 06             452   LCALL putstr
+034B  15 81                453   DEC SP
+034D  15 81                454   DEC SP
+034F  74 00                455   MOV A,#0
+0351  F5 51                456   MOV eof,A
+0353                       457  ?AB32 EQU *
+0353  E5 51                458   MOV A,eof
+0355  12 12 0C             459   LCALL ?sign
+0358  7B 00                460   MOV R3,#0
+035A  12 12 03             461   LCALL ?tsign
+035D  12 12 DE             462   LCALL ?eq
+0360  45 F0                463   ORL A,B
+0362  70 03                464   JNZ ?AB34
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 9
+
+0364  02 05 9F             465   LJMP ?AB33
+0367                       466  ?AB34 EQU *
+0367  74 11                467   MOV A,#17
+0369  75 F0 00             468   MOV B,#0
+036C  C0 E0                469   PUSH A
+036E  C0 F0                470   PUSH B
+0370  12 11 1A             471   LCALL putch
+0373  15 81                472   DEC SP
+0375  15 81                473   DEC SP
+0377  79 1F                474   MOV R1,#buffer
+0379  7A 00                475   MOV R2,#=buffer
+037B  E9                   476   MOV A,R1
+037C  8A F0                477   MOV B,R2
+037E  C0 E0                478   PUSH A
+0380  C0 F0                479   PUSH B
+0382  74 32                480   MOV A,#50
+0384  75 F0 00             481   MOV B,#0
+0387  C0 E0                482   PUSH A
+0389  C0 F0                483   PUSH B
+038B  12 11 98             484   LCALL _getstr
+038E  15 81                485   DEC SP
+0390  15 81                486   DEC SP
+0392  15 81                487   DEC SP
+0394  15 81                488   DEC SP
+0396  74 13                489   MOV A,#19
+0398  75 F0 00             490   MOV B,#0
+039B  C0 E0                491   PUSH A
+039D  C0 F0                492   PUSH B
+039F  12 11 1A             493   LCALL putch
+03A2  15 81                494   DEC SP
+03A4  15 81                495   DEC SP
+03A6  74 96                496   MOV A,#?AB0+17&255
+03A8  75 F0 13             497   MOV B,#?AB0+17/256
+03AB  C0 E0                498   PUSH A
+03AD  C0 F0                499   PUSH B
+03AF  79 1F                500   MOV R1,#buffer
+03B1  7A 00                501   MOV R2,#=buffer
+03B3  E9                   502   MOV A,R1
+03B4  8A F0                503   MOV B,R2
+03B6  C0 E0                504   PUSH A
+03B8  C0 F0                505   PUSH B
+03BA  74 32                506   MOV A,#50
+03BC  75 F0 00             507   MOV B,#0
+03BF  C0 E0                508   PUSH A
+03C1  C0 F0                509   PUSH B
+03C3  74 03                510   MOV A,#3
+03C5  75 F0 00             511   MOV B,#0
+03C8  12 0F 71             512   LCALL printf
+03CB  7F FA                513   MOV R7,#-6
+03CD  12 11 E6             514   LCALL ?adjstk
+03D0  74 07                515   MOV A,#7
+03D2  75 F0 00             516   MOV B,#0
+03D5  79 1F                517   MOV R1,#buffer
+03D7  7A 00                518   MOV R2,#=buffer
+03D9  12 11 FC             519   LCALL ?addi
+03DC  E7                   520   MOV A,[R1]
+03DD  12 12 0C             521   LCALL ?sign
+03E0  C0 E0                522   PUSH A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 10
+
+03E2  C0 F0                523   PUSH B
+03E4  74 08                524   MOV A,#8
+03E6  75 F0 00             525   MOV B,#0
+03E9  79 1F                526   MOV R1,#buffer
+03EB  7A 00                527   MOV R2,#=buffer
+03ED  12 11 FC             528   LCALL ?addi
+03F0  E7                   529   MOV A,[R1]
+03F1  12 12 0C             530   LCALL ?sign
+03F4  C0 E0                531   PUSH A
+03F6  C0 F0                532   PUSH B
+03F8  12 02 C4             533   LCALL to_hex
+03FB  15 81                534   DEC SP
+03FD  15 81                535   DEC SP
+03FF  15 81                536   DEC SP
+0401  15 81                537   DEC SP
+0403  F5 51                538   MOV eof,A
+0405  74 00                539   MOV A,#0
+0407  F5 11                540   MOV bcc,A
+0409  74 01                541   MOV A,#1
+040B  75 F0 00             542   MOV B,#0
+040E  79 1F                543   MOV R1,#buffer
+0410  7A 00                544   MOV R2,#=buffer
+0412  12 11 FC             545   LCALL ?addi
+0415  E7                   546   MOV A,[R1]
+0416  12 12 0C             547   LCALL ?sign
+0419  C0 E0                548   PUSH A
+041B  C0 F0                549   PUSH B
+041D  74 02                550   MOV A,#2
+041F  75 F0 00             551   MOV B,#0
+0422  79 1F                552   MOV R1,#buffer
+0424  7A 00                553   MOV R2,#=buffer
+0426  12 11 FC             554   LCALL ?addi
+0429  E7                   555   MOV A,[R1]
+042A  12 12 0C             556   LCALL ?sign
+042D  C0 E0                557   PUSH A
+042F  C0 F0                558   PUSH B
+0431  12 02 C4             559   LCALL to_hex
+0434  15 81                560   DEC SP
+0436  15 81                561   DEC SP
+0438  15 81                562   DEC SP
+043A  15 81                563   DEC SP
+043C  75 F0 00             564   MOV B,#0
+043F  F5 19                565   MOV bytes,A
+0441  85 F0 1A             566   MOV bytes+1,B
+0444  E5 11                567   MOV A,bcc
+0446  75 F0 00             568   MOV B,#0
+0449  25 19                569   ADD A,bytes
+044B  C5 F0                570   XCH A,B
+044D  35 1A                571   ADDC A,bytes+1
+044F  C5 F0                572   XCH A,B
+0451  F5 11                573   MOV bcc,A
+0453  74 03                574   MOV A,#3
+0455  75 F0 00             575   MOV B,#0
+0458  79 1F                576   MOV R1,#buffer
+045A  7A 00                577   MOV R2,#=buffer
+045C  12 11 FC             578   LCALL ?addi
+045F  E7                   579   MOV A,[R1]
+0460  12 12 0C             580   LCALL ?sign
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 11
+
+0463  C0 E0                581   PUSH A
+0465  C0 F0                582   PUSH B
+0467  74 04                583   MOV A,#4
+0469  75 F0 00             584   MOV B,#0
+046C  79 1F                585   MOV R1,#buffer
+046E  7A 00                586   MOV R2,#=buffer
+0470  12 11 FC             587   LCALL ?addi
+0473  E7                   588   MOV A,[R1]
+0474  12 12 0C             589   LCALL ?sign
+0477  C0 E0                590   PUSH A
+0479  C0 F0                591   PUSH B
+047B  12 02 C4             592   LCALL to_hex
+047E  15 81                593   DEC SP
+0480  15 81                594   DEC SP
+0482  15 81                595   DEC SP
+0484  15 81                596   DEC SP
+0486  75 F0 00             597   MOV B,#0
+0489  F5 13                598   MOV address,A
+048B  85 F0 14             599   MOV address+1,B
+048E  E5 11                600   MOV A,bcc
+0490  75 F0 00             601   MOV B,#0
+0493  25 13                602   ADD A,address
+0495  C5 F0                603   XCH A,B
+0497  35 14                604   ADDC A,address+1
+0499  C5 F0                605   XCH A,B
+049B  F5 11                606   MOV bcc,A
+049D  E5 13                607   MOV A,address
+049F  85 14 F0             608   MOV B,address+1
+04A2  7B 08                609   MOV R3,#8
+04A4  7C 00                610   MOV R4,#0
+04A6  12 12 85             611   LCALL ?shl
+04A9  F5 13                612   MOV address,A
+04AB  85 F0 14             613   MOV address+1,B
+04AE  74 05                614   MOV A,#5
+04B0  75 F0 00             615   MOV B,#0
+04B3  79 1F                616   MOV R1,#buffer
+04B5  7A 00                617   MOV R2,#=buffer
+04B7  12 11 FC             618   LCALL ?addi
+04BA  E7                   619   MOV A,[R1]
+04BB  12 12 0C             620   LCALL ?sign
+04BE  C0 E0                621   PUSH A
+04C0  C0 F0                622   PUSH B
+04C2  74 06                623   MOV A,#6
+04C4  75 F0 00             624   MOV B,#0
+04C7  79 1F                625   MOV R1,#buffer
+04C9  7A 00                626   MOV R2,#=buffer
+04CB  12 11 FC             627   LCALL ?addi
+04CE  E7                   628   MOV A,[R1]
+04CF  12 12 0C             629   LCALL ?sign
+04D2  C0 E0                630   PUSH A
+04D4  C0 F0                631   PUSH B
+04D6  12 02 C4             632   LCALL to_hex
+04D9  15 81                633   DEC SP
+04DB  15 81                634   DEC SP
+04DD  15 81                635   DEC SP
+04DF  15 81                636   DEC SP
+04E1  75 F0 00             637   MOV B,#0
+04E4  45 13                638   ORL A,address
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 12
+
+04E6  C5 F0                639   XCH A,B
+04E8  45 14                640   ORL A,address+1
+04EA  C5 F0                641   XCH A,B
+04EC  F5 13                642   MOV address,A
+04EE  85 F0 14             643   MOV address+1,B
+04F1  E5 13                644   MOV A,address
+04F3  85 14 F0             645   MOV B,address+1
+04F6  54 FF                646   ANL A,#255
+04F8  C5 F0                647   XCH A,B
+04FA  54 00                648   ANL A,#0
+04FC  C5 F0                649   XCH A,B
+04FE  25 11                650   ADD A,bcc
+0500  C5 F0                651   XCH A,B
+0502  34 00                652   ADDC A,#0
+0504  C5 F0                653   XCH A,B
+0506  F5 11                654   MOV bcc,A
+0508  74 00                655   MOV A,#0
+050A  75 F0 00             656   MOV B,#0
+050D  F5 09                657   MOV i,A
+050F  85 F0 0A             658   MOV i+1,B
+0512                       659  ?AB35 EQU *
+0512  E5 09                660   MOV A,i
+0514  85 0A F0             661   MOV B,i+1
+0517  AB 19                662   MOV R3,bytes
+0519  AC 1A                663   MOV R4,bytes+1
+051B  12 12 F1             664   LCALL ?ult
+051E  45 F0                665   ORL A,B
+0520  70 03                666   JNZ ?AB37
+0522  02 05 95             667   LJMP ?AB36
+0525                       668  ?AB37 EQU *
+0525  80 12                669   SJMP ?AB38
+0527                       670  ?AB39 EQU *
+0527  E5 09                671   MOV A,i
+0529  85 0A F0             672   MOV B,i+1
+052C  12 12 A4             673   LCALL ?inc
+052F  F5 09                674   MOV i,A
+0531  85 F0 0A             675   MOV i+1,B
+0534  12 12 AD             676   LCALL ?dec
+0537  80 D9                677   SJMP ?AB35
+0539                       678  ?AB38 EQU *
+0539  E5 09                679   MOV A,i
+053B  85 0A F0             680   MOV B,i+1
+053E  C3                   681   CLR C
+053F  33                   682   RLC A
+0540  C5 F0                683   XCH A,B
+0542  33                   684   RLC A
+0543  C5 F0                685   XCH A,B
+0545  24 09                686   ADD A,#9
+0547  C5 F0                687   XCH A,B
+0549  34 00                688   ADDC A,#0
+054B  C5 F0                689   XCH A,B
+054D  79 1F                690   MOV R1,#buffer
+054F  7A 00                691   MOV R2,#=buffer
+0551  12 11 FC             692   LCALL ?addi
+0554  E7                   693   MOV A,[R1]
+0555  12 12 0C             694   LCALL ?sign
+0558  C0 E0                695   PUSH A
+055A  C0 F0                696   PUSH B
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 13
+
+055C  E5 09                697   MOV A,i
+055E  85 0A F0             698   MOV B,i+1
+0561  C3                   699   CLR C
+0562  33                   700   RLC A
+0563  C5 F0                701   XCH A,B
+0565  33                   702   RLC A
+0566  C5 F0                703   XCH A,B
+0568  24 0A                704   ADD A,#10
+056A  C5 F0                705   XCH A,B
+056C  34 00                706   ADDC A,#0
+056E  C5 F0                707   XCH A,B
+0570  79 1F                708   MOV R1,#buffer
+0572  7A 00                709   MOV R2,#=buffer
+0574  12 11 FC             710   LCALL ?addi
+0577  E7                   711   MOV A,[R1]
+0578  12 12 0C             712   LCALL ?sign
+057B  C0 E0                713   PUSH A
+057D  C0 F0                714   PUSH B
+057F  12 02 C4             715   LCALL to_hex
+0582  15 81                716   DEC SP
+0584  15 81                717   DEC SP
+0586  15 81                718   DEC SP
+0588  15 81                719   DEC SP
+058A  F5 0C                720   MOV temp,A
+058C  E5 11                721   MOV A,bcc
+058E  25 0C                722   ADD A,temp
+0590  F5 11                723   MOV bcc,A
+0592  02 05 27             724   LJMP ?AB39
+0595                       725  ?AB36 EQU *
+0595  E5 11                726   MOV A,bcc
+0597  F4                   727    CPL A
+0598  24 01                728   ADD A,#1
+059A  F5 11                729   MOV bcc,A
+059C  02 03 53             730   LJMP ?AB32
+059F                       731  ?AB33 EQU *
+059F  12 02 1E             732   LCALL sendprompt
+05A2                       733  ?AB30 EQU *
+05A2  22                   734   RET
+05A3                       735  read_lockbit EQU *
+05A3  E5 12                736   MOV A,command
+05A5  12 12 0C             737   LCALL ?sign
+05A8  7B 71                738   MOV R3,#113
+05AA  12 12 03             739   LCALL ?tsign
+05AD  12 12 DE             740   LCALL ?eq
+05B0  45 F0                741   ORL A,B
+05B2  70 03                742   JNZ ?AB41
+05B4  02 06 02             743   LJMP ?AB40
+05B7                       744  ?AB41 EQU *
+05B7  D2 B2                745   SETB P3.2
+05B9  C2 B3                746   CLR P3.3
+05BB  D2 B4                747   SETB P3.4
+05BD  D2 B5                748   SETB P3.5
+05BF  C2 A7                749   CLR P2.7
+05C1  D2 B6                750   SETB P3.6
+05C3  C2 B7                751   CLR P3.7
+05C5  74 0A                752   MOV A,#10
+05C7  75 F0 00             753   MOV B,#0
+05CA  C0 E0                754   PUSH A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 14
+
+05CC  C0 F0                755   PUSH B
+05CE  12 10 C6             756   LCALL delay
+05D1  15 81                757   DEC SP
+05D3  15 81                758   DEC SP
+05D5  74 FF                759   MOV A,#255
+05D7  F5 80                760   MOV P0,A
+05D9  E5 80                761   MOV A,P0
+05DB  F5 0C                762   MOV temp,A
+05DD  74 9D                763   MOV A,#?AB0+24&255
+05DF  75 F0 13             764   MOV B,#?AB0+24/256
+05E2  C0 E0                765   PUSH A
+05E4  C0 F0                766   PUSH B
+05E6  E5 0C                767   MOV A,temp
+05E8  75 F0 00             768   MOV B,#0
+05EB  C0 E0                769   PUSH A
+05ED  C0 F0                770   PUSH B
+05EF  74 02                771   MOV A,#2
+05F1  75 F0 00             772   MOV B,#0
+05F4  12 0F 71             773   LCALL printf
+05F7  15 81                774   DEC SP
+05F9  15 81                775   DEC SP
+05FB  15 81                776   DEC SP
+05FD  15 81                777   DEC SP
+05FF  12 02 1E             778   LCALL sendprompt
+0602                       779  ?AB40 EQU *
+0602  22                   780   RET
+0603                       781  manual_VPP EQU *
+0603  E5 12                782   MOV A,command
+0605  12 12 0C             783   LCALL ?sign
+0608  7B 76                784   MOV R3,#118
+060A  12 12 03             785   LCALL ?tsign
+060D  12 12 DE             786   LCALL ?eq
+0610  45 F0                787   ORL A,B
+0612  70 03                788   JNZ ?AB43
+0614  02 06 41             789   LJMP ?AB42
+0617                       790  ?AB43 EQU *
+0617  74 A3                791   MOV A,#?AB0+30&255
+0619  75 F0 13             792   MOV B,#?AB0+30/256
+061C  C0 E0                793   PUSH A
+061E  C0 F0                794   PUSH B
+0620  12 11 06             795   LCALL putstr
+0623  15 81                796   DEC SP
+0625  15 81                797   DEC SP
+0627  D2 B3                798   SETB P3.3
+0629  74 AE                799   MOV A,#?AB0+41&255
+062B  75 F0 13             800   MOV B,#?AB0+41/256
+062E  C0 E0                801   PUSH A
+0630  C0 F0                802   PUSH B
+0632  12 11 06             803   LCALL putstr
+0635  15 81                804   DEC SP
+0637  15 81                805   DEC SP
+0639  12 11 32             806   LCALL getch
+063C  C2 B3                807   CLR P3.3
+063E  12 02 1E             808   LCALL sendprompt
+0641                       809  ?AB42 EQU *
+0641  22                   810   RET
+0642                       811  read_ID EQU *
+0642  E5 12                812   MOV A,command
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 15
+
+0644  12 12 0C             813   LCALL ?sign
+0647  7B 69                814   MOV R3,#105
+0649  12 12 03             815   LCALL ?tsign
+064C  12 12 DE             816   LCALL ?eq
+064F  45 F0                817   ORL A,B
+0651  70 03                818   JNZ ?AB45
+0653  02 06 5F             819   LJMP ?AB44
+0656                       820  ?AB45 EQU *
+0656  12 0B 59             821   LCALL readID
+0659  12 02 08             822   LCALL putok
+065C  12 02 1E             823   LCALL sendprompt
+065F                       824  ?AB44 EQU *
+065F  22                   825   RET
+0660  05 81                826  block_select INC SP
+0662  E5 12                827   MOV A,command
+0664  12 12 0C             828   LCALL ?sign
+0667  7B 62                829   MOV R3,#98
+0669  12 12 03             830   LCALL ?tsign
+066C  12 12 DE             831   LCALL ?eq
+066F  45 F0                832   ORL A,B
+0671  70 03                833   JNZ ?AB47
+0673  02 06 DD             834   LJMP ?AB46
+0676                       835  ?AB47 EQU *
+0676  74 CD                836   MOV A,#?AB0+72&255
+0678  75 F0 13             837   MOV B,#?AB0+72/256
+067B  C0 E0                838   PUSH A
+067D  C0 F0                839   PUSH B
+067F  12 11 06             840   LCALL putstr
+0682  15 81                841   DEC SP
+0684  15 81                842   DEC SP
+0686  12 11 32             843   LCALL getch
+0689  C0 E0                844   PUSH A
+068B  C0 F0                845   PUSH B
+068D  12 11 42             846   LCALL putchr
+0690  15 81                847   DEC SP
+0692  15 81                848   DEC SP
+0694  78 FE                849   MOV R0,#-2
+0696  12 11 DA             850   LCALL ?auto0
+0699  F6                   851   MOV [R0],A
+069A  E6                   852   MOV A,[R0]
+069B  12 12 0C             853   LCALL ?sign
+069E  7B 31                854   MOV R3,#49
+06A0  12 12 03             855   LCALL ?tsign
+06A3  12 12 DE             856   LCALL ?eq
+06A6  45 F0                857   ORL A,B
+06A8  70 03                858   JNZ ?AB49
+06AA  02 06 B4             859   LJMP ?AB48
+06AD                       860  ?AB49 EQU *
+06AD  74 A5                861   MOV A,#165
+06AF  F5 0C                862   MOV temp,A
+06B1  02 06 B8             863   LJMP ?AB50
+06B4                       864  ?AB48 EQU *
+06B4  74 55                865   MOV A,#85
+06B6  F5 0C                866   MOV temp,A
+06B8                       867  ?AB50 EQU *
+06B8  E5 0C                868   MOV A,temp
+06BA  F5 A0                869   MOV P2,A
+06BC  D2 B7                870   SETB P3.7
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 16
+
+06BE  C2 B6                871   CLR P3.6
+06C0  C2 B5                872   CLR P3.5
+06C2  D2 B4                873   SETB P3.4
+06C4  12 0E D6             874   LCALL pulseProg
+06C7  74 64                875   MOV A,#100
+06C9  75 F0 00             876   MOV B,#0
+06CC  C0 E0                877   PUSH A
+06CE  C0 F0                878   PUSH B
+06D0  12 10 C6             879   LCALL delay
+06D3  15 81                880   DEC SP
+06D5  15 81                881   DEC SP
+06D7  12 02 08             882   LCALL putok
+06DA  12 02 1E             883   LCALL sendprompt
+06DD                       884  ?AB46 EQU *
+06DD  15 81                885   DEC SP
+06DF  22                   886   RET
+06E0                       887  erase EQU *
+06E0  E5 12                888   MOV A,command
+06E2  12 12 0C             889   LCALL ?sign
+06E5  7B 65                890   MOV R3,#101
+06E7  12 12 03             891   LCALL ?tsign
+06EA  12 12 DE             892   LCALL ?eq
+06ED  45 F0                893   ORL A,B
+06EF  70 03                894   JNZ ?AB52
+06F1  02 07 9D             895   LJMP ?AB51
+06F4                       896  ?AB52 EQU *
+06F4  E5 0E                897   MOV A,chip
+06F6  75 F0 00             898   MOV B,#0
+06F9  7B 52                899   MOV R3,#82
+06FB  7C 00                900   MOV R4,#0
+06FD  12 12 DE             901   LCALL ?eq
+0700  45 F0                902   ORL A,B
+0702  70 03                903   JNZ ?AB54
+0704  02 07 48             904   LJMP ?AB53
+0707                       905  ?AB54 EQU *
+0707  D2 B3                906   SETB P3.3
+0709  74 64                907   MOV A,#100
+070B  75 F0 00             908   MOV B,#0
+070E  C0 E0                909   PUSH A
+0710  C0 F0                910   PUSH B
+0712  12 10 C6             911   LCALL delay
+0715  15 81                912   DEC SP
+0717  15 81                913   DEC SP
+0719  D2 B4                914   SETB P3.4
+071B  C2 B5                915   CLR P3.5
+071D  D2 A7                916   SETB P2.7
+071F  C2 B6                917   CLR P3.6
+0721  C2 B7                918   CLR P3.7
+0723  74 0A                919   MOV A,#10
+0725  75 F0 00             920   MOV B,#0
+0728  C0 E0                921   PUSH A
+072A  C0 F0                922   PUSH B
+072C  12 10 C6             923   LCALL delay
+072F  15 81                924   DEC SP
+0731  15 81                925   DEC SP
+0733  12 0E D6             926   LCALL pulseProg
+0736  74 64                927   MOV A,#100
+0738  75 F0 00             928   MOV B,#0
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 17
+
+073B  C0 E0                929   PUSH A
+073D  C0 F0                930   PUSH B
+073F  12 10 C6             931   LCALL delay
+0742  15 81                932   DEC SP
+0744  15 81                933   DEC SP
+0746  C2 B3                934   CLR P3.3
+0748                       935  ?AB53 EQU *
+0748  E5 0E                936   MOV A,chip
+074A  75 F0 00             937   MOV B,#0
+074D  7B 93                938   MOV R3,#147
+074F  7C 00                939   MOV R4,#0
+0751  12 12 DE             940   LCALL ?eq
+0754  45 F0                941   ORL A,B
+0756  70 03                942   JNZ ?AB56
+0758  02 07 9A             943   LJMP ?AB55
+075B                       944  ?AB56 EQU *
+075B  D2 B3                945   SETB P3.3
+075D  74 64                946   MOV A,#100
+075F  75 F0 00             947   MOV B,#0
+0762  C0 E0                948   PUSH A
+0764  C0 F0                949   PUSH B
+0766  12 10 C6             950   LCALL delay
+0769  15 81                951   DEC SP
+076B  15 81                952   DEC SP
+076D  D2 B4                953   SETB P3.4
+076F  C2 B5                954   CLR P3.5
+0771  D2 B6                955   SETB P3.6
+0773  D2 B7                956   SETB P3.7
+0775  74 0A                957   MOV A,#10
+0777  75 F0 00             958   MOV B,#0
+077A  C0 E0                959   PUSH A
+077C  C0 F0                960   PUSH B
+077E  12 10 C6             961   LCALL delay
+0781  15 81                962   DEC SP
+0783  15 81                963   DEC SP
+0785  12 0E D6             964   LCALL pulseProg
+0788  74 64                965   MOV A,#100
+078A  75 F0 00             966   MOV B,#0
+078D  C0 E0                967   PUSH A
+078F  C0 F0                968   PUSH B
+0791  12 10 C6             969   LCALL delay
+0794  15 81                970   DEC SP
+0796  15 81                971   DEC SP
+0798  C2 B3                972   CLR P3.3
+079A                       973  ?AB55 EQU *
+079A  12 02 08             974   LCALL putok
+079D                       975  ?AB51 EQU *
+079D  22                   976   RET
+079E                       977  write EQU *
+079E  E5 12                978   MOV A,command
+07A0  12 12 0C             979   LCALL ?sign
+07A3  7B 77                980   MOV R3,#119
+07A5  12 12 03             981   LCALL ?tsign
+07A8  12 12 DE             982   LCALL ?eq
+07AB  45 F0                983   ORL A,B
+07AD  70 03                984   JNZ ?AB58
+07AF  02 08 CB             985   LJMP ?AB57
+07B2                       986  ?AB58 EQU *
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 18
+
+07B2  E5 0E                987   MOV A,chip
+07B4  75 F0 00             988   MOV B,#0
+07B7  7B 52                989   MOV R3,#82
+07B9  7C 00                990   MOV R4,#0
+07BB  12 12 DE             991   LCALL ?eq
+07BE  45 F0                992   ORL A,B
+07C0  70 0C                993   JNZ ?AB60
+07C2  E5 0E                994   MOV A,chip
+07C4  75 F0 00             995   MOV B,#0
+07C7  7B 93                996   MOV R3,#147
+07C9  7C 00                997   MOV R4,#0
+07CB  12 12 DE             998   LCALL ?eq
+07CE                       999  ?AB60 EQU *
+07CE  45 F0               1000   ORL A,B
+07D0  70 03               1001   JNZ ?AB61
+07D2  02 08 CB            1002   LJMP ?AB59
+07D5                      1003  ?AB61 EQU *
+07D5  C2 B3               1004   CLR P3.3
+07D7  C2 B4               1005   CLR P3.4
+07D9  D2 B5               1006   SETB P3.5
+07DB  D2 A7               1007   SETB P2.7
+07DD  D2 B6               1008   SETB P3.6
+07DF  D2 B7               1009   SETB P3.7
+07E1  D2 B2               1010   SETB P3.2
+07E3  12 0E DF            1011   LCALL delay10us
+07E6  D2 B3               1012   SETB P3.3
+07E8  74 64               1013   MOV A,#100
+07EA  75 F0 00            1014   MOV B,#0
+07ED  C0 E0               1015   PUSH A
+07EF  C0 F0               1016   PUSH B
+07F1  12 10 C6            1017   LCALL delay
+07F4  15 81               1018   DEC SP
+07F6  15 81               1019   DEC SP
+07F8  74 00               1020   MOV A,#0
+07FA  75 F0 00            1021   MOV B,#0
+07FD  F5 15               1022   MOV chksum,A
+07FF  85 F0 16            1023   MOV chksum+1,B
+0802  74 00               1024   MOV A,#0
+0804  75 F0 00            1025   MOV B,#0
+0807  F5 09               1026   MOV i,A
+0809  85 F0 0A            1027   MOV i+1,B
+080C                      1028  ?AB62 EQU *
+080C  E5 09               1029   MOV A,i
+080E  85 0A F0            1030   MOV B,i+1
+0811  AB 17               1031   MOV R3,count
+0813  AC 18               1032   MOV R4,count+1
+0815  12 12 F1            1033   LCALL ?ult
+0818  45 F0               1034   ORL A,B
+081A  70 03               1035   JNZ ?AB64
+081C  02 08 B6            1036   LJMP ?AB63
+081F                      1037  ?AB64 EQU *
+081F  80 12               1038   SJMP ?AB65
+0821                      1039  ?AB66 EQU *
+0821  E5 09               1040   MOV A,i
+0823  85 0A F0            1041   MOV B,i+1
+0826  12 12 A4            1042   LCALL ?inc
+0829  F5 09               1043   MOV i,A
+082B  85 F0 0A            1044   MOV i+1,B
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 19
+
+082E  12 12 AD            1045   LCALL ?dec
+0831  80 D9               1046   SJMP ?AB62
+0833                      1047  ?AB65 EQU *
+0833  74 11               1048   MOV A,#17
+0835  75 F0 00            1049   MOV B,#0
+0838  C0 E0               1050   PUSH A
+083A  C0 F0               1051   PUSH B
+083C  12 11 1A            1052   LCALL putch
+083F  15 81               1053   DEC SP
+0841  15 81               1054   DEC SP
+0843  E5 09               1055   MOV A,i
+0845  85 0A F0            1056   MOV B,i+1
+0848  F5 13               1057   MOV address,A
+084A  85 F0 14            1058   MOV address+1,B
+084D  E5 0E               1059   MOV A,chip
+084F  75 F0 00            1060   MOV B,#0
+0852  7B 52               1061   MOV R3,#82
+0854  7C 00               1062   MOV R4,#0
+0856  12 12 DE            1063   LCALL ?eq
+0859  45 F0               1064   ORL A,B
+085B  70 03               1065   JNZ ?AB68
+085D  02 08 69            1066   LJMP ?AB67
+0860                      1067  ?AB68 EQU *
+0860  85 13 90            1068         mov P1,address  
+0863  E5 14               1069         mov A,address+1
+0865  44 80               1070         ORL A,#$80  
+0867  F5 A0               1071         mov P2,A
+0869                      1072  ?AB67 EQU *
+0869  E5 0E               1073   MOV A,chip
+086B  75 F0 00            1074   MOV B,#0
+086E  7B 93               1075   MOV R3,#147
+0870  7C 00               1076   MOV R4,#0
+0872  12 12 DE            1077   LCALL ?eq
+0875  45 F0               1078   ORL A,B
+0877  70 03               1079   JNZ ?AB70
+0879  02 08 83            1080   LJMP ?AB69
+087C                      1081  ?AB70 EQU *
+087C  85 13 90            1082         mov P1,address  
+087F  E5 14               1083         mov A,address+1
+0881  F5 A0               1084         mov P2,A
+0883                      1085  ?AB69 EQU *
+0883  12 0E DF            1086   LCALL delay10us
+0886  12 11 57            1087   LCALL getchr
+0889  F5 80               1088   MOV P0,A
+088B  74 13               1089   MOV A,#19
+088D  75 F0 00            1090   MOV B,#0
+0890  C0 E0               1091   PUSH A
+0892  C0 F0               1092   PUSH B
+0894  12 11 1A            1093   LCALL putch
+0897  15 81               1094   DEC SP
+0899  15 81               1095   DEC SP
+089B  E5 15               1096   MOV A,chksum
+089D  85 16 F0            1097   MOV B,chksum+1
+08A0  25 80               1098   ADD A,P0
+08A2  C5 F0               1099   XCH A,B
+08A4  34 00               1100   ADDC A,#0
+08A6  C5 F0               1101   XCH A,B
+08A8  F5 15               1102   MOV chksum,A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 20
+
+08AA  85 F0 16            1103   MOV chksum+1,B
+08AD  12 0E D6            1104   LCALL pulseProg
+08B0  12 0F 28            1105   LCALL delay100us
+08B3  02 08 21            1106   LJMP ?AB66
+08B6                      1107  ?AB63 EQU *
+08B6  C2 B3               1108   CLR P3.3
+08B8  74 64               1109   MOV A,#100
+08BA  75 F0 00            1110   MOV B,#0
+08BD  C0 E0               1111   PUSH A
+08BF  C0 F0               1112   PUSH B
+08C1  12 10 C6            1113   LCALL delay
+08C4  15 81               1114   DEC SP
+08C6  15 81               1115   DEC SP
+08C8  12 02 08            1116   LCALL putok
+08CB                      1117  ?AB59 EQU *
+08CB                      1118  ?AB57 EQU *
+08CB  22                  1119   RET
+08CC  05 81               1120  read INC SP
+08CE  05 81               1121   INC SP
+08D0  E5 12               1122   MOV A,command
+08D2  12 12 0C            1123   LCALL ?sign
+08D5  7B 72               1124   MOV R3,#114
+08D7  12 12 03            1125   LCALL ?tsign
+08DA  12 12 DE            1126   LCALL ?eq
+08DD  45 F0               1127   ORL A,B
+08DF  70 03               1128   JNZ ?AB72
+08E1  02 09 7E            1129   LJMP ?AB71
+08E4                      1130  ?AB72 EQU *
+08E4  74 00               1131   MOV A,#0
+08E6  75 F0 00            1132   MOV B,#0
+08E9  F5 15               1133   MOV chksum,A
+08EB  85 F0 16            1134   MOV chksum+1,B
+08EE  D2 B2               1135   SETB P3.2
+08F0  C2 B4               1136   CLR P3.4
+08F2  C2 B5               1137   CLR P3.5
+08F4  C2 A7               1138   CLR P2.7
+08F6  D2 B6               1139   SETB P3.6
+08F8  D2 B7               1140   SETB P3.7
+08FA  74 31               1141   MOV A,#49
+08FC  F5 0D               1142   MOV blank,A
+08FE  74 00               1143   MOV A,#0
+0900  75 F0 00            1144   MOV B,#0
+0903  78 FD               1145   MOV R0,#-3
+0905  12 11 DA            1146   LCALL ?auto0
+0908  F6                  1147   MOV [R0],A
+0909  08                  1148   INC R0
+090A  A6 F0               1149   MOV [R0],B
+090C                      1150  ?AB73 EQU *
+090C  78 FD               1151   MOV R0,#-3
+090E  12 11 DA            1152   LCALL ?auto0
+0911  E6                  1153   MOV A,[R0]
+0912  08                  1154   INC R0
+0913  86 F0               1155   MOV B,[R0]
+0915  AB 17               1156   MOV R3,count
+0917  AC 18               1157   MOV R4,count+1
+0919  12 12 F1            1158   LCALL ?ult
+091C  45 F0               1159   ORL A,B
+091E  70 03               1160   JNZ ?AB75
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 21
+
+0920  02 09 7B            1161   LJMP ?AB74
+0923                      1162  ?AB75 EQU *
+0923  80 16               1163   SJMP ?AB76
+0925                      1164  ?AB77 EQU *
+0925  78 FD               1165   MOV R0,#-3
+0927  12 11 DA            1166   LCALL ?auto0
+092A  E6                  1167   MOV A,[R0]
+092B  08                  1168   INC R0
+092C  86 F0               1169   MOV B,[R0]
+092E  12 12 A4            1170   LCALL ?inc
+0931  18                  1171   DEC R0
+0932  F6                  1172   MOV [R0],A
+0933  08                  1173   INC R0
+0934  A6 F0               1174   MOV [R0],B
+0936  12 12 AD            1175   LCALL ?dec
+0939  80 D1               1176   SJMP ?AB73
+093B                      1177  ?AB76 EQU *
+093B  78 FD               1178   MOV R0,#-3
+093D  12 11 DA            1179   LCALL ?auto0
+0940  E6                  1180   MOV A,[R0]
+0941  08                  1181   INC R0
+0942  86 F0               1182   MOV B,[R0]
+0944  F5 13               1183   MOV address,A
+0946  85 F0 14            1184   MOV address+1,B
+0949  85 13 90            1185         mov P1,address
+094C  E5 14               1186         mov A,address+1
+094E  F5 A0               1187         mov P2,A
+0950  75 80 FF            1188   mov P0,#$FF
+0953  E5 15               1189   MOV A,chksum
+0955  85 16 F0            1190   MOV B,chksum+1
+0958  25 80               1191   ADD A,P0
+095A  C5 F0               1192   XCH A,B
+095C  34 00               1193   ADDC A,#0
+095E  C5 F0               1194   XCH A,B
+0960  F5 15               1195   MOV chksum,A
+0962  85 F0 16            1196   MOV chksum+1,B
+0965  E5 80               1197   MOV A,P0
+0967  75 F0 00            1198   MOV B,#0
+096A  C0 E0               1199   PUSH A
+096C  C0 F0               1200   PUSH B
+096E  12 09 83            1201   LCALL printA
+0971  15 81               1202   DEC SP
+0973  15 81               1203   DEC SP
+0975  12 09 AA            1204   LCALL chkXOFF
+0978  02 09 25            1205   LJMP ?AB77
+097B                      1206  ?AB74 EQU *
+097B  12 02 08            1207   LCALL putok
+097E                      1208  ?AB71 EQU *
+097E  15 81               1209   DEC SP
+0980  15 81               1210   DEC SP
+0982  22                  1211   RET
+0983                      1212  printA EQU *
+0983  78 FB               1213   MOV R0,#-5
+0985  12 11 DA            1214   LCALL ?auto0
+0988  E6                  1215   MOV A,[R0]
+0989  F5 0B               1216   MOV ACCU,A
+098B  E5 0B               1217   MOV A,ACCU
+098D  75 F0 00            1218   MOV B,#0
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 22
+
+0990  7B 04               1219   MOV R3,#4
+0992  7C 00               1220   MOV R4,#0
+0994  12 12 93            1221   LCALL ?shr
+0997  F5 0B               1222   MOV ACCU,A
+0999  12 09 CD            1223   LCALL putHEX
+099C  78 FB               1224   MOV R0,#-5
+099E  12 11 DA            1225   LCALL ?auto0
+09A1  E6                  1226   MOV A,[R0]
+09A2  54 0F               1227   ANL A,#15
+09A4  F5 0B               1228   MOV ACCU,A
+09A6  12 09 CD            1229   LCALL putHEX
+09A9  22                  1230   RET
+09AA                      1231  chkXOFF EQU *
+09AA  12 01 E6            1232   LCALL getconsole
+09AD  7B 13               1233   MOV R3,#19
+09AF  7C 00               1234   MOV R4,#0
+09B1  12 12 DE            1235   LCALL ?eq
+09B4  45 F0               1236   ORL A,B
+09B6  70 03               1237   JNZ ?AB79
+09B8  02 09 CC            1238   LJMP ?AB78
+09BB                      1239  ?AB79 EQU *
+09BB                      1240  ?AB80 EQU *
+09BB                      1241  ?AB81 EQU *
+09BB  12 01 E6            1242   LCALL getconsole
+09BE  7B 11               1243   MOV R3,#17
+09C0  7C 00               1244   MOV R4,#0
+09C2  12 12 E7            1245   LCALL ?ne
+09C5  45 F0               1246   ORL A,B
+09C7  60 03               1247   JZ ?AB83
+09C9  02 09 BB            1248   LJMP ?AB80
+09CC                      1249  ?AB83 EQU *
+09CC                      1250  ?AB82 EQU *
+09CC                      1251  ?AB78 EQU *
+09CC  22                  1252   RET
+09CD                      1253  putHEX EQU *
+09CD  E5 0B               1254   MOV A,ACCU
+09CF  75 F0 00            1255   MOV B,#0
+09D2  7B 09               1256   MOV R3,#9
+09D4  7C 00               1257   MOV R4,#0
+09D6  12 13 01            1258   LCALL ?ugt
+09D9  45 F0               1259   ORL A,B
+09DB  70 03               1260   JNZ ?AB85
+09DD  02 09 F5            1261   LJMP ?AB84
+09E0                      1262  ?AB85 EQU *
+09E0  E5 0B               1263   MOV A,ACCU
+09E2  24 37               1264   ADD A,#55
+09E4  75 F0 00            1265   MOV B,#0
+09E7  C0 E0               1266   PUSH A
+09E9  C0 F0               1267   PUSH B
+09EB  12 11 1A            1268   LCALL putch
+09EE  15 81               1269   DEC SP
+09F0  15 81               1270   DEC SP
+09F2  02 0A 07            1271   LJMP ?AB86
+09F5                      1272  ?AB84 EQU *
+09F5  E5 0B               1273   MOV A,ACCU
+09F7  24 30               1274   ADD A,#48
+09F9  75 F0 00            1275   MOV B,#0
+09FC  C0 E0               1276   PUSH A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 23
+
+09FE  C0 F0               1277   PUSH B
+0A00  12 11 1A            1278   LCALL putch
+0A03  15 81               1279   DEC SP
+0A05  15 81               1280   DEC SP
+0A07                      1281  ?AB86 EQU *
+0A07  22                  1282   RET
+0A08                      1283  blanktest EQU *
+0A08  E5 80               1284   MOV A,P0
+0A0A  75 F0 00            1285   MOV B,#0
+0A0D  7B FF               1286   MOV R3,#255
+0A0F  7C 00               1287   MOV R4,#0
+0A11  12 12 E7            1288   LCALL ?ne
+0A14  45 F0               1289   ORL A,B
+0A16  70 03               1290   JNZ ?AB88
+0A18  02 0A 2F            1291   LJMP ?AB87
+0A1B                      1292  ?AB88 EQU *
+0A1B  74 30               1293   MOV A,#48
+0A1D  F5 0D               1294   MOV blank,A
+0A1F  E5 1B               1295   MOV A,nonblank
+0A21  85 1C F0            1296   MOV B,nonblank+1
+0A24  12 12 A4            1297   LCALL ?inc
+0A27  F5 1B               1298   MOV nonblank,A
+0A29  85 F0 1C            1299   MOV nonblank+1,B
+0A2C  12 12 AD            1300   LCALL ?dec
+0A2F                      1301  ?AB87 EQU *
+0A2F  22                  1302   RET
+0A30                      1303  lock EQU *
+0A30  E5 12               1304   MOV A,command
+0A32  12 12 0C            1305   LCALL ?sign
+0A35  7B 6C               1306   MOV R3,#108
+0A37  12 12 03            1307   LCALL ?tsign
+0A3A  12 12 DE            1308   LCALL ?eq
+0A3D  45 F0               1309   ORL A,B
+0A3F  70 03               1310   JNZ ?AB90
+0A41  02 0B 13            1311   LJMP ?AB89
+0A44                      1312  ?AB90 EQU *
+0A44  74 DC               1313   MOV A,#?AB0+87&255
+0A46  75 F0 13            1314   MOV B,#?AB0+87/256
+0A49  C0 E0               1315   PUSH A
+0A4B  C0 F0               1316   PUSH B
+0A4D  12 11 06            1317   LCALL putstr
+0A50  15 81               1318   DEC SP
+0A52  15 81               1319   DEC SP
+0A54  74 0F               1320   MOV A,#?AB0+138&255
+0A56  75 F0 14            1321   MOV B,#?AB0+138/256
+0A59  C0 E0               1322   PUSH A
+0A5B  C0 F0               1323   PUSH B
+0A5D  12 11 06            1324   LCALL putstr
+0A60  15 81               1325   DEC SP
+0A62  15 81               1326   DEC SP
+0A64  12 11 57            1327   LCALL getchr
+0A67  F5 0C               1328   MOV temp,A
+0A69  E5 0C               1329   MOV A,temp
+0A6B  75 F0 00            1330   MOV B,#0
+0A6E  7B 79               1331   MOV R3,#121
+0A70  7C 00               1332   MOV R4,#0
+0A72  12 12 DE            1333   LCALL ?eq
+0A75  45 F0               1334   ORL A,B
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 24
+
+0A77  70 03               1335   JNZ ?AB92
+0A79  02 0B 00            1336   LJMP ?AB91
+0A7C                      1337  ?AB92 EQU *
+0A7C  D2 B3               1338   SETB P3.3
+0A7E  74 64               1339   MOV A,#100
+0A80  75 F0 00            1340   MOV B,#0
+0A83  C0 E0               1341   PUSH A
+0A85  C0 F0               1342   PUSH B
+0A87  12 10 C6            1343   LCALL delay
+0A8A  15 81               1344   DEC SP
+0A8C  15 81               1345   DEC SP
+0A8E  D2 B2               1346   SETB P3.2
+0A90  D2 B4               1347   SETB P3.4
+0A92  D2 B5               1348   SETB P3.5
+0A94  D2 A7               1349   SETB P2.7
+0A96  D2 B6               1350   SETB P3.6
+0A98  D2 B7               1351   SETB P3.7
+0A9A  12 0E D6            1352   LCALL pulseProg
+0A9D  74 64               1353   MOV A,#100
+0A9F  75 F0 00            1354   MOV B,#0
+0AA2  C0 E0               1355   PUSH A
+0AA4  C0 F0               1356   PUSH B
+0AA6  12 10 C6            1357   LCALL delay
+0AA9  15 81               1358   DEC SP
+0AAB  15 81               1359   DEC SP
+0AAD  74 05               1360   MOV A,#5
+0AAF  75 F0 00            1361   MOV B,#0
+0AB2  C0 E0               1362   PUSH A
+0AB4  C0 F0               1363   PUSH B
+0AB6  12 10 C6            1364   LCALL delay
+0AB9  15 81               1365   DEC SP
+0ABB  15 81               1366   DEC SP
+0ABD  C2 B6               1367   CLR P3.6
+0ABF  C2 B7               1368   CLR P3.7
+0AC1  12 0E D6            1369   LCALL pulseProg
+0AC4  74 64               1370   MOV A,#100
+0AC6  75 F0 00            1371   MOV B,#0
+0AC9  C0 E0               1372   PUSH A
+0ACB  C0 F0               1373   PUSH B
+0ACD  12 10 C6            1374   LCALL delay
+0AD0  15 81               1375   DEC SP
+0AD2  15 81               1376   DEC SP
+0AD4  C2 B5               1377   CLR P3.5
+0AD6  D2 B6               1378   SETB P3.6
+0AD8  C2 B7               1379   CLR P3.7
+0ADA  12 0E D6            1380   LCALL pulseProg
+0ADD  74 64               1381   MOV A,#100
+0ADF  75 F0 00            1382   MOV B,#0
+0AE2  C0 E0               1383   PUSH A
+0AE4  C0 F0               1384   PUSH B
+0AE6  12 10 C6            1385   LCALL delay
+0AE9  15 81               1386   DEC SP
+0AEB  15 81               1387   DEC SP
+0AED  74 27               1388   MOV A,#?AB0+162&255
+0AEF  75 F0 14            1389   MOV B,#?AB0+162/256
+0AF2  C0 E0               1390   PUSH A
+0AF4  C0 F0               1391   PUSH B
+0AF6  12 11 06            1392   LCALL putstr
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 25
+
+0AF9  15 81               1393   DEC SP
+0AFB  15 81               1394   DEC SP
+0AFD  02 0B 10            1395   LJMP ?AB93
+0B00                      1396  ?AB91 EQU *
+0B00  74 36               1397   MOV A,#?AB0+177&255
+0B02  75 F0 14            1398   MOV B,#?AB0+177/256
+0B05  C0 E0               1399   PUSH A
+0B07  C0 F0               1400   PUSH B
+0B09  12 11 06            1401   LCALL putstr
+0B0C  15 81               1402   DEC SP
+0B0E  15 81               1403   DEC SP
+0B10                      1404  ?AB93 EQU *
+0B10  12 02 08            1405   LCALL putok
+0B13                      1406  ?AB89 EQU *
+0B13  22                  1407   RET
+0B14                      1408  printchksum EQU *
+0B14  E5 12               1409   MOV A,command
+0B16  12 12 0C            1410   LCALL ?sign
+0B19  7B 63               1411   MOV R3,#99
+0B1B  12 12 03            1412   LCALL ?tsign
+0B1E  12 12 DE            1413   LCALL ?eq
+0B21  45 F0               1414   ORL A,B
+0B23  70 03               1415   JNZ ?AB95
+0B25  02 0B 58            1416   LJMP ?AB94
+0B28                      1417  ?AB95 EQU *
+0B28  74 3D               1418   MOV A,#?AB0+184&255
+0B2A  75 F0 14            1419   MOV B,#?AB0+184/256
+0B2D  C0 E0               1420   PUSH A
+0B2F  C0 F0               1421   PUSH B
+0B31  E5 15               1422   MOV A,chksum
+0B33  85 16 F0            1423   MOV B,chksum+1
+0B36  12 12 B7            1424   LCALL ?com
+0B39  24 01               1425   ADD A,#1
+0B3B  C5 F0               1426   XCH A,B
+0B3D  34 00               1427   ADDC A,#0
+0B3F  C5 F0               1428   XCH A,B
+0B41  C0 E0               1429   PUSH A
+0B43  C0 F0               1430   PUSH B
+0B45  74 02               1431   MOV A,#2
+0B47  75 F0 00            1432   MOV B,#0
+0B4A  12 0F 71            1433   LCALL printf
+0B4D  15 81               1434   DEC SP
+0B4F  15 81               1435   DEC SP
+0B51  15 81               1436   DEC SP
+0B53  15 81               1437   DEC SP
+0B55  12 02 08            1438   LCALL putok
+0B58                      1439  ?AB94 EQU *
+0B58  22                  1440   RET
+0B59                      1441  readID EQU *
+0B59  C2 B3               1442   CLR P3.3
+0B5B  D2 B2               1443   SETB P3.2
+0B5D  C2 B4               1444   CLR P3.4
+0B5F  C2 B5               1445   CLR P3.5
+0B61  C2 B6               1446   CLR P3.6
+0B63  C2 B7               1447   CLR P3.7
+0B65  74 31               1448   MOV A,#49
+0B67  75 F0 00            1449   MOV B,#0
+0B6A  F5 13               1450   MOV address,A
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 26
+
+0B6C  85 F0 14            1451   MOV address+1,B
+0B6F  85 13 90            1452         mov P1,address
+0B72  E5 14               1453         mov A,address+1
+0B74  F5 A0               1454         mov P2,A
+0B76  12 0E DF            1455   LCALL delay10us
+0B79  74 FF               1456   MOV A,#255
+0B7B  F5 80               1457   MOV P0,A
+0B7D  E5 80               1458   MOV A,P0
+0B7F  F5 0E               1459   MOV chip,A
+0B81  E5 0E               1460   MOV A,chip
+0B83  75 F0 00            1461   MOV B,#0
+0B86  7B 93               1462   MOV R3,#147
+0B88  7C 00               1463   MOV R4,#0
+0B8A  12 12 E7            1464   LCALL ?ne
+0B8D  45 F0               1465   ORL A,B
+0B8F  70 03               1466   JNZ ?AB97
+0B91  02 0B B0            1467   LJMP ?AB96
+0B94                      1468  ?AB97 EQU *
+0B94  74 00               1469   MOV A,#0
+0B96  75 F0 01            1470   MOV B,#1
+0B99  F5 13               1471   MOV address,A
+0B9B  85 F0 14            1472   MOV address+1,B
+0B9E  85 13 90            1473         mov P1,address         
+0BA1  E5 14               1474         mov A,address+1
+0BA3  F5 A0               1475         mov P2,A
+0BA5  12 0E DF            1476   LCALL delay10us
+0BA8  74 FF               1477   MOV A,#255
+0BAA  F5 80               1478   MOV P0,A
+0BAC  E5 80               1479   MOV A,P0
+0BAE  F5 0E               1480   MOV chip,A
+0BB0                      1481  ?AB96 EQU *
+0BB0  22                  1482   RET
+0BB1                      1483  signature EQU *
+0BB1  12 0B 59            1484   LCALL readID
+0BB4  74 4D               1485   MOV A,#?AB0+200&255
+0BB6  75 F0 14            1486   MOV B,#?AB0+200/256
+0BB9  C0 E0               1487   PUSH A
+0BBB  C0 F0               1488   PUSH B
+0BBD  E5 0E               1489   MOV A,chip
+0BBF  75 F0 00            1490   MOV B,#0
+0BC2  C0 E0               1491   PUSH A
+0BC4  C0 F0               1492   PUSH B
+0BC6  74 02               1493   MOV A,#2
+0BC8  75 F0 00            1494   MOV B,#0
+0BCB  12 0F 71            1495   LCALL printf
+0BCE  15 81               1496   DEC SP
+0BD0  15 81               1497   DEC SP
+0BD2  15 81               1498   DEC SP
+0BD4  15 81               1499   DEC SP
+0BD6  C2 B3               1500   CLR P3.3
+0BD8  74 FF               1501   MOV A,#255
+0BDA  F5 80               1502   MOV P0,A
+0BDC  E5 80               1503   MOV A,P0
+0BDE  F5 0F               1504   MOV VPP,A
+0BE0  22                  1505   RET
+0BE1                      1506  testblank EQU *
+0BE1  12 0B B1            1507   LCALL signature
+0BE4  E5 0E               1508   MOV A,chip
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 27
+
+0BE6  75 F0 00            1509   MOV B,#0
+0BE9  90 0C 4A            1510   MOV DPTR,#?AB99
+0BEC  02 12 15            1511   LJMP ?switch
+0BEF                      1512  ?AB100 EQU *
+0BEF  74 00               1513   MOV A,#0
+0BF1  75 F0 10            1514   MOV B,#16
+0BF4  F5 19               1515   MOV bytes,A
+0BF6  85 F0 1A            1516   MOV bytes+1,B
+0BF9  02 0C 6A            1517   LJMP ?AB98
+0BFC                      1518  ?AB101 EQU *
+0BFC  74 00               1519   MOV A,#0
+0BFE  75 F0 10            1520   MOV B,#16
+0C01  F5 19               1521   MOV bytes,A
+0C03  85 F0 1A            1522   MOV bytes+1,B
+0C06  02 0C 6A            1523   LJMP ?AB98
+0C09                      1524  ?AB102 EQU *
+0C09  74 00               1525   MOV A,#0
+0C0B  75 F0 20            1526   MOV B,#32
+0C0E  F5 19               1527   MOV bytes,A
+0C10  85 F0 1A            1528   MOV bytes+1,B
+0C13  02 0C 6A            1529   LJMP ?AB98
+0C16                      1530  ?AB103 EQU *
+0C16  74 00               1531   MOV A,#0
+0C18  75 F0 20            1532   MOV B,#32
+0C1B  F5 19               1533   MOV bytes,A
+0C1D  85 F0 1A            1534   MOV bytes+1,B
+0C20  02 0C 6A            1535   LJMP ?AB98
+0C23                      1536  ?AB104 EQU *
+0C23  74 00               1537   MOV A,#0
+0C25  75 F0 50            1538   MOV B,#80
+0C28  F5 19               1539   MOV bytes,A
+0C2A  85 F0 1A            1540   MOV bytes+1,B
+0C2D  02 0C 6A            1541   LJMP ?AB98
+0C30                      1542  ?AB105 EQU *
+0C30  74 00               1543   MOV A,#0
+0C32  75 F0 50            1544   MOV B,#80
+0C35  F5 19               1545   MOV bytes,A
+0C37  85 F0 1A            1546   MOV bytes+1,B
+0C3A  02 0C 6A            1547   LJMP ?AB98
+0C3D                      1548  ?AB106 EQU *
+0C3D  74 00               1549   MOV A,#0
+0C3F  75 F0 00            1550   MOV B,#0
+0C42  F5 19               1551   MOV bytes,A
+0C44  85 F0 1A            1552   MOV bytes+1,B
+0C47  02 0C 6A            1553   LJMP ?AB98
+0C4A                      1554  ?AB99 EQU *
+0C4A  3D 0C FF 00 30 0C + 1555   DRW ?AB106,255,?AB105,101,?AB104,85,?AB103,98,?AB102,82,?AB101,97,?AB100
+0C64  51 00 00 00 6A 0C   1556   DRW 81,0,?AB98
+0C6A                      1557  ?AB98 EQU *
+0C6A  74 00               1558   MOV A,#0
+0C6C  75 F0 00            1559   MOV B,#0
+0C6F  F5 15               1560   MOV chksum,A
+0C71  85 F0 16            1561   MOV chksum+1,B
+0C74  74 00               1562   MOV A,#0
+0C76  75 F0 00            1563   MOV B,#0
+0C79  F5 1B               1564   MOV nonblank,A
+0C7B  85 F0 1C            1565   MOV nonblank+1,B
+0C7E  C2 B3               1566   CLR P3.3
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 28
+
+0C80  D2 B2               1567   SETB P3.2
+0C82  C2 B4               1568   CLR P3.4
+0C84  C2 B5               1569   CLR P3.5
+0C86  D2 B6               1570   SETB P3.6
+0C88  D2 B7               1571   SETB P3.7
+0C8A  74 31               1572   MOV A,#49
+0C8C  F5 0D               1573   MOV blank,A
+0C8E  74 00               1574   MOV A,#0
+0C90  75 F0 00            1575   MOV B,#0
+0C93  F5 09               1576   MOV i,A
+0C95  85 F0 0A            1577   MOV i+1,B
+0C98                      1578  ?AB107 EQU *
+0C98  E5 09               1579   MOV A,i
+0C9A  85 0A F0            1580   MOV B,i+1
+0C9D  AB 19               1581   MOV R3,bytes
+0C9F  AC 1A               1582   MOV R4,bytes+1
+0CA1  12 12 F1            1583   LCALL ?ult
+0CA4  45 F0               1584   ORL A,B
+0CA6  70 03               1585   JNZ ?AB109
+0CA8  02 0C EC            1586   LJMP ?AB108
+0CAB                      1587  ?AB109 EQU *
+0CAB  80 12               1588   SJMP ?AB110
+0CAD                      1589  ?AB111 EQU *
+0CAD  E5 09               1590   MOV A,i
+0CAF  85 0A F0            1591   MOV B,i+1
+0CB2  12 12 A4            1592   LCALL ?inc
+0CB5  F5 09               1593   MOV i,A
+0CB7  85 F0 0A            1594   MOV i+1,B
+0CBA  12 12 AD            1595   LCALL ?dec
+0CBD  80 D9               1596   SJMP ?AB107
+0CBF                      1597  ?AB110 EQU *
+0CBF  E5 09               1598   MOV A,i
+0CC1  85 0A F0            1599   MOV B,i+1
+0CC4  F5 13               1600   MOV address,A
+0CC6  85 F0 14            1601   MOV address+1,B
+0CC9  85 13 90            1602         mov P1,address
+0CCC  E5 14               1603         mov A,address+1
+0CCE                      1604      
+0CCE  F5 A0               1605         mov P2,A
+0CD0                      1606      
+0CD0  74 FF               1607   MOV A,#255
+0CD2  F5 80               1608   MOV P0,A
+0CD4  E5 15               1609   MOV A,chksum
+0CD6  85 16 F0            1610   MOV B,chksum+1
+0CD9  25 80               1611   ADD A,P0
+0CDB  C5 F0               1612   XCH A,B
+0CDD  34 00               1613   ADDC A,#0
+0CDF  C5 F0               1614   XCH A,B
+0CE1  F5 15               1615   MOV chksum,A
+0CE3  85 F0 16            1616   MOV chksum+1,B
+0CE6  12 0A 08            1617   LCALL blanktest
+0CE9  02 0C AD            1618   LJMP ?AB111
+0CEC                      1619  ?AB108 EQU *
+0CEC  22                  1620   RET
+0CED                      1621  setcounter EQU *
+0CED  E5 12               1622   MOV A,command
+0CEF  12 12 0C            1623   LCALL ?sign
+0CF2  7B 73               1624   MOV R3,#115
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 29
+
+0CF4  12 12 03            1625   LCALL ?tsign
+0CF7  12 12 DE            1626   LCALL ?eq
+0CFA  45 F0               1627   ORL A,B
+0CFC  70 03               1628   JNZ ?AB113
+0CFE  02 0D 0C            1629   LJMP ?AB112
+0D01                      1630  ?AB113 EQU *
+0D01  12 00 E9            1631   LCALL getnum
+0D04  F5 17               1632   MOV count,A
+0D06  85 F0 18            1633   MOV count+1,B
+0D09  12 02 08            1634   LCALL putok
+0D0C                      1635  ?AB112 EQU *
+0D0C  22                  1636   RET
+0D0D                      1637  getinfo EQU *
+0D0D  E5 12               1638   MOV A,command
+0D0F  12 12 0C            1639   LCALL ?sign
+0D12  7B 67               1640   MOV R3,#103
+0D14  12 12 03            1641   LCALL ?tsign
+0D17  12 12 DE            1642   LCALL ?eq
+0D1A  45 F0               1643   ORL A,B
+0D1C  70 03               1644   JNZ ?AB115
+0D1E  02 0D D7            1645   LJMP ?AB114
+0D21                      1646  ?AB115 EQU *
+0D21  12 0B B1            1647   LCALL signature
+0D24  E5 0E               1648   MOV A,chip
+0D26  75 F0 00            1649   MOV B,#0
+0D29  7B FF               1650   MOV R3,#255
+0D2B  7C 00               1651   MOV R4,#0
+0D2D  12 12 E7            1652   LCALL ?ne
+0D30  45 F0               1653   ORL A,B
+0D32  70 03               1654   JNZ ?AB117
+0D34  02 0D C4            1655   LJMP ?AB116
+0D37                      1656  ?AB117 EQU *
+0D37  E5 0E               1657   MOV A,chip
+0D39  75 F0 00            1658   MOV B,#0
+0D3C  7B 93               1659   MOV R3,#147
+0D3E  7C 00               1660   MOV R4,#0
+0D40  12 12 DE            1661   LCALL ?eq
+0D43  45 F0               1662   ORL A,B
+0D45  70 03               1663   JNZ ?AB119
+0D47  02 0D 5A            1664   LJMP ?AB118
+0D4A                      1665  ?AB119 EQU *
+0D4A  74 50               1666   MOV A,#?AB0+203&255
+0D4C  75 F0 14            1667   MOV B,#?AB0+203/256
+0D4F  C0 E0               1668   PUSH A
+0D51  C0 F0               1669   PUSH B
+0D53  12 11 06            1670   LCALL putstr
+0D56  15 81               1671   DEC SP
+0D58  15 81               1672   DEC SP
+0D5A                      1673  ?AB118 EQU *
+0D5A  E5 0E               1674   MOV A,chip
+0D5C  75 F0 00            1675   MOV B,#0
+0D5F  7B 52               1676   MOV R3,#82
+0D61  7C 00               1677   MOV R4,#0
+0D63  12 12 DE            1678   LCALL ?eq
+0D66  45 F0               1679   ORL A,B
+0D68  70 03               1680   JNZ ?AB121
+0D6A  02 0D 7D            1681   LJMP ?AB120
+0D6D                      1682  ?AB121 EQU *
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 30
+
+0D6D  74 62               1683   MOV A,#?AB0+221&255
+0D6F  75 F0 14            1684   MOV B,#?AB0+221/256
+0D72  C0 E0               1685   PUSH A
+0D74  C0 F0               1686   PUSH B
+0D76  12 11 06            1687   LCALL putstr
+0D79  15 81               1688   DEC SP
+0D7B  15 81               1689   DEC SP
+0D7D                      1690  ?AB120 EQU *
+0D7D  74 78               1691   MOV A,#?AB0+243&255
+0D7F  75 F0 14            1692   MOV B,#?AB0+243/256
+0D82  C0 E0               1693   PUSH A
+0D84  C0 F0               1694   PUSH B
+0D86  E5 1B               1695   MOV A,nonblank
+0D88  85 1C F0            1696   MOV B,nonblank+1
+0D8B  C0 E0               1697   PUSH A
+0D8D  C0 F0               1698   PUSH B
+0D8F  74 02               1699   MOV A,#2
+0D91  75 F0 00            1700   MOV B,#0
+0D94  12 0F 71            1701   LCALL printf
+0D97  15 81               1702   DEC SP
+0D99  15 81               1703   DEC SP
+0D9B  15 81               1704   DEC SP
+0D9D  15 81               1705   DEC SP
+0D9F  74 8C               1706   MOV A,#?AB0+263&255
+0DA1  75 F0 14            1707   MOV B,#?AB0+263/256
+0DA4  C0 E0               1708   PUSH A
+0DA6  C0 F0               1709   PUSH B
+0DA8  E5 17               1710   MOV A,count
+0DAA  85 18 F0            1711   MOV B,count+1
+0DAD  C0 E0               1712   PUSH A
+0DAF  C0 F0               1713   PUSH B
+0DB1  74 02               1714   MOV A,#2
+0DB3  75 F0 00            1715   MOV B,#0
+0DB6  12 0F 71            1716   LCALL printf
+0DB9  15 81               1717   DEC SP
+0DBB  15 81               1718   DEC SP
+0DBD  15 81               1719   DEC SP
+0DBF  15 81               1720   DEC SP
+0DC1  02 0D D4            1721   LJMP ?AB122
+0DC4                      1722  ?AB116 EQU *
+0DC4  74 9F               1723   MOV A,#?AB0+282&255
+0DC6  75 F0 14            1724   MOV B,#?AB0+282/256
+0DC9  C0 E0               1725   PUSH A
+0DCB  C0 F0               1726   PUSH B
+0DCD  12 11 06            1727   LCALL putstr
+0DD0  15 81               1728   DEC SP
+0DD2  15 81               1729   DEC SP
+0DD4                      1730  ?AB122 EQU *
+0DD4  12 02 08            1731   LCALL putok
+0DD7                      1732  ?AB114 EQU *
+0DD7  22                  1733   RET
+0DD8                      1734  PGMparameters EQU *
+0DD8  E5 12               1735   MOV A,command
+0DDA  12 12 0C            1736   LCALL ?sign
+0DDD  7B 70               1737   MOV R3,#112
+0DDF  12 12 03            1738   LCALL ?tsign
+0DE2  12 12 DE            1739   LCALL ?eq
+0DE5  45 F0               1740   ORL A,B
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 31
+
+0DE7  70 03               1741   JNZ ?AB124
+0DE9  02 0E 3D            1742   LJMP ?AB123
+0DEC                      1743  ?AB124 EQU *
+0DEC  12 0B 59            1744   LCALL readID
+0DEF  74 64               1745   MOV A,#100
+0DF1  75 F0 00            1746   MOV B,#0
+0DF4  C0 E0               1747   PUSH A
+0DF6  C0 F0               1748   PUSH B
+0DF8  12 10 C6            1749   LCALL delay
+0DFB  15 81               1750   DEC SP
+0DFD  15 81               1751   DEC SP
+0DFF  74 00               1752   MOV A,#0
+0E01  75 F0 00            1753   MOV B,#0
+0E04  F5 1B               1754   MOV nonblank,A
+0E06  85 F0 1C            1755   MOV nonblank+1,B
+0E09  74 B2               1756   MOV A,#?AB0+301&255
+0E0B  75 F0 14            1757   MOV B,#?AB0+301/256
+0E0E  C0 E0               1758   PUSH A
+0E10  C0 F0               1759   PUSH B
+0E12  74 52               1760   MOV A,#82
+0E14  75 F0 00            1761   MOV B,#0
+0E17  C0 E0               1762   PUSH A
+0E19  C0 F0               1763   PUSH B
+0E1B  E5 1B               1764   MOV A,nonblank
+0E1D  85 1C F0            1765   MOV B,nonblank+1
+0E20  C0 E0               1766   PUSH A
+0E22  C0 F0               1767   PUSH B
+0E24  E5 17               1768   MOV A,count
+0E26  85 18 F0            1769   MOV B,count+1
+0E29  C0 E0               1770   PUSH A
+0E2B  C0 F0               1771   PUSH B
+0E2D  74 04               1772   MOV A,#4
+0E2F  75 F0 00            1773   MOV B,#0
+0E32  12 0F 71            1774   LCALL printf
+0E35  7F F8               1775   MOV R7,#-8
+0E37  12 11 E6            1776   LCALL ?adjstk
+0E3A  12 02 08            1777   LCALL putok
+0E3D                      1778  ?AB123 EQU *
+0E3D  22                  1779   RET
+0E3E                      1780  printhelp EQU *
+0E3E  E5 12               1781   MOV A,command
+0E40  12 12 0C            1782   LCALL ?sign
+0E43  7B 3F               1783   MOV R3,#63
+0E45  12 12 03            1784   LCALL ?tsign
+0E48  12 12 DE            1785   LCALL ?eq
+0E4B  45 F0               1786   ORL A,B
+0E4D  70 03               1787   JNZ ?AB126
+0E4F  02 0E D5            1788   LJMP ?AB125
+0E52                      1789  ?AB126 EQU *
+0E52  74 BB               1790   MOV A,#?AB0+310&255
+0E54  75 F0 14            1791   MOV B,#?AB0+310/256
+0E57  C0 E0               1792   PUSH A
+0E59  C0 F0               1793   PUSH B
+0E5B  12 11 06            1794   LCALL putstr
+0E5E  15 81               1795   DEC SP
+0E60  15 81               1796   DEC SP
+0E62  74 CB               1797   MOV A,#?AB0+326&255
+0E64  75 F0 14            1798   MOV B,#?AB0+326/256
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 32
+
+0E67  C0 E0               1799   PUSH A
+0E69  C0 F0               1800   PUSH B
+0E6B  12 11 06            1801   LCALL putstr
+0E6E  15 81               1802   DEC SP
+0E70  15 81               1803   DEC SP
+0E72  74 DD               1804   MOV A,#?AB0+344&255
+0E74  75 F0 14            1805   MOV B,#?AB0+344/256
+0E77  C0 E0               1806   PUSH A
+0E79  C0 F0               1807   PUSH B
+0E7B  12 11 06            1808   LCALL putstr
+0E7E  15 81               1809   DEC SP
+0E80  15 81               1810   DEC SP
+0E82  74 F4               1811   MOV A,#?AB0+367&255
+0E84  75 F0 14            1812   MOV B,#?AB0+367/256
+0E87  C0 E0               1813   PUSH A
+0E89  C0 F0               1814   PUSH B
+0E8B  12 11 06            1815   LCALL putstr
+0E8E  15 81               1816   DEC SP
+0E90  15 81               1817   DEC SP
+0E92  74 02               1818   MOV A,#?AB0+381&255
+0E94  75 F0 15            1819   MOV B,#?AB0+381/256
+0E97  C0 E0               1820   PUSH A
+0E99  C0 F0               1821   PUSH B
+0E9B  12 11 06            1822   LCALL putstr
+0E9E  15 81               1823   DEC SP
+0EA0  15 81               1824   DEC SP
+0EA2  74 14               1825   MOV A,#?AB0+399&255
+0EA4  75 F0 15            1826   MOV B,#?AB0+399/256
+0EA7  C0 E0               1827   PUSH A
+0EA9  C0 F0               1828   PUSH B
+0EAB  12 11 06            1829   LCALL putstr
+0EAE  15 81               1830   DEC SP
+0EB0  15 81               1831   DEC SP
+0EB2  74 26               1832   MOV A,#?AB0+417&255
+0EB4  75 F0 15            1833   MOV B,#?AB0+417/256
+0EB7  C0 E0               1834   PUSH A
+0EB9  C0 F0               1835   PUSH B
+0EBB  12 11 06            1836   LCALL putstr
+0EBE  15 81               1837   DEC SP
+0EC0  15 81               1838   DEC SP
+0EC2  74 35               1839   MOV A,#?AB0+432&255
+0EC4  75 F0 15            1840   MOV B,#?AB0+432/256
+0EC7  C0 E0               1841   PUSH A
+0EC9  C0 F0               1842   PUSH B
+0ECB  12 11 06            1843   LCALL putstr
+0ECE  15 81               1844   DEC SP
+0ED0  15 81               1845   DEC SP
+0ED2  12 02 1E            1846   LCALL sendprompt
+0ED5                      1847  ?AB125 EQU *
+0ED5  22                  1848   RET
+0ED6                      1849  pulseProg EQU *
+0ED6  C2 B2               1850   CLR P3.2
+0ED8  00                  1851          NOP
+0ED9  00                  1852          NOP
+0EDA  00                  1853          NOP
+0EDB  00                  1854          NOP
+0EDC  D2 B2               1855   SETB P3.2
+0EDE  22                  1856   RET
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 33
+
+0EDF  05 81               1857  delay10us INC SP
+0EE1  05 81               1858   INC SP
+0EE3  74 00               1859   MOV A,#0
+0EE5  75 F0 00            1860   MOV B,#0
+0EE8  78 FD               1861   MOV R0,#-3
+0EEA  12 11 DA            1862   LCALL ?auto0
+0EED  F6                  1863   MOV [R0],A
+0EEE  08                  1864   INC R0
+0EEF  A6 F0               1865   MOV [R0],B
+0EF1                      1866  ?AB127 EQU *
+0EF1  78 FD               1867   MOV R0,#-3
+0EF3  12 11 DA            1868   LCALL ?auto0
+0EF6  E6                  1869   MOV A,[R0]
+0EF7  08                  1870   INC R0
+0EF8  86 F0               1871   MOV B,[R0]
+0EFA  7B 01               1872   MOV R3,#1
+0EFC  7C 00               1873   MOV R4,#0
+0EFE  12 12 BE            1874   LCALL ?lt
+0F01  45 F0               1875   ORL A,B
+0F03  70 03               1876   JNZ ?AB129
+0F05  02 0F 23            1877   LJMP ?AB128
+0F08                      1878  ?AB129 EQU *
+0F08  80 16               1879   SJMP ?AB130
+0F0A                      1880  ?AB131 EQU *
+0F0A  78 FD               1881   MOV R0,#-3
+0F0C  12 11 DA            1882   LCALL ?auto0
+0F0F  E6                  1883   MOV A,[R0]
+0F10  08                  1884   INC R0
+0F11  86 F0               1885   MOV B,[R0]
+0F13  12 12 A4            1886   LCALL ?inc
+0F16  18                  1887   DEC R0
+0F17  F6                  1888   MOV [R0],A
+0F18  08                  1889   INC R0
+0F19  A6 F0               1890   MOV [R0],B
+0F1B  12 12 AD            1891   LCALL ?dec
+0F1E  80 D1               1892   SJMP ?AB127
+0F20                      1893  ?AB130 EQU *
+0F20  02 0F 0A            1894   LJMP ?AB131
+0F23                      1895  ?AB128 EQU *
+0F23  15 81               1896   DEC SP
+0F25  15 81               1897   DEC SP
+0F27  22                  1898   RET
+0F28  05 81               1899  delay100us INC SP
+0F2A  05 81               1900   INC SP
+0F2C  74 00               1901   MOV A,#0
+0F2E  75 F0 00            1902   MOV B,#0
+0F31  78 FD               1903   MOV R0,#-3
+0F33  12 11 DA            1904   LCALL ?auto0
+0F36  F6                  1905   MOV [R0],A
+0F37  08                  1906   INC R0
+0F38  A6 F0               1907   MOV [R0],B
+0F3A                      1908  ?AB132 EQU *
+0F3A  78 FD               1909   MOV R0,#-3
+0F3C  12 11 DA            1910   LCALL ?auto0
+0F3F  E6                  1911   MOV A,[R0]
+0F40  08                  1912   INC R0
+0F41  86 F0               1913   MOV B,[R0]
+0F43  7B 0A               1914   MOV R3,#10
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 34
+
+0F45  7C 00               1915   MOV R4,#0
+0F47  12 12 BE            1916   LCALL ?lt
+0F4A  45 F0               1917   ORL A,B
+0F4C  70 03               1918   JNZ ?AB134
+0F4E  02 0F 6C            1919   LJMP ?AB133
+0F51                      1920  ?AB134 EQU *
+0F51  80 16               1921   SJMP ?AB135
+0F53                      1922  ?AB136 EQU *
+0F53  78 FD               1923   MOV R0,#-3
+0F55  12 11 DA            1924   LCALL ?auto0
+0F58  E6                  1925   MOV A,[R0]
+0F59  08                  1926   INC R0
+0F5A  86 F0               1927   MOV B,[R0]
+0F5C  12 12 A4            1928   LCALL ?inc
+0F5F  18                  1929   DEC R0
+0F60  F6                  1930   MOV [R0],A
+0F61  08                  1931   INC R0
+0F62  A6 F0               1932   MOV [R0],B
+0F64  12 12 AD            1933   LCALL ?dec
+0F67  80 D1               1934   SJMP ?AB132
+0F69                      1935  ?AB135 EQU *
+0F69  02 0F 53            1936   LJMP ?AB136
+0F6C                      1937  ?AB133 EQU *
+0F6C  15 81               1938   DEC SP
+0F6E  15 81               1939   DEC SP
+0F70  22                  1940   RET
+0F71                      1941  * Formatted print to console for tiny model: register printf(format, args...)
+0F71  23                  1942  printf	RL	A		Two bytes/Stack entry
+0F72  F4                  1943  	CPL	A		Convert to minus & adjust
+0F73  25 81               1944  	ADD	A,SP		Offset to SP
+0F75  F8                  1945  	MOV	R0,A		R0 = stack
+0F76  86 82               1946  	MOV	DPL,[R0]	Get format LOW
+0F78  08                  1947  	INC	R0		Advance
+0F79  86 83               1948  	MOV	DPH,[R0]	Get format HIGH
+0F7B  08                  1949  	INC	R0		Advance
+0F7C  E4                  1950  ?AC1	CLR	A		Get ZERO
+0F7D  FE                  1951  	MOV	R6,A		Clear flags
+0F7E  FF                  1952  	MOV	R7,A		Clear width
+0F7F  93                  1953  	MOVC	A,[A+DPTR]	Read value
+0F80  70 01               1954  	JNZ	?AC2		Not end of string
+0F82  22                  1955  	RET
+0F83                      1956  * For special '%' command, process operands
+0F83  B4 25 55            1957  ?AC2	CJNE	A,#'%',?AC11	Not a special character
+0F86  A3                  1958  	INC	DPTR		Advance to next
+0F87  E4                  1959  	CLR	A		Zero offset
+0F88  93                  1960  	MOVC	A,[A+DPTR]	Get following char
+0F89                      1961  * If '-', left justify
+0F89  B4 2D 06            1962  	CJNE	A,#'-',?AC3	No a minus
+0F8C  43 07 80            1963  	ORL	?R7,#%10000000	Set left justify bit
+0F8F  A3                  1964  	INC	DPTR		Advance to next
+0F90  E4                  1965  	CLR	A		Zero offset
+0F91  93                  1966  	MOVC	A,[A+DPTR]	Get next char
+0F92                      1967  * If leading '0', zero fill
+0F92  B4 30 03            1968  ?AC3	CJNE	A,#'0',?AC4	Zero fill
+0F95  43 07 40            1969  	ORL	?R7,#%01000000	Set ZERO FILL bit
+0F98                      1970  * Evaluate the field width
+0F98  24 D0               1971  ?AC4	ADD	A,#-'0'		Convert to zero
+0F9A  B4 0A 00            1972  	CJNE	A,#10,*+3	Compare with no corrution
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 35
+
+0F9D  50 0C               1973  	JNC	?AC5		Exit
+0F9F  CE                  1974  	XCH	A,R6		Get width, save char
+0FA0  75 F0 0A            1975  	MOV	B,#10		*10
+0FA3  A4                  1976  	MUL			Get new width
+0FA4  2E                  1977  	ADD	A,R6		Include new value
+0FA5  FE                  1978  	MOV	R6,A		Copy back
+0FA6  A3                  1979  	INC	DPTR		Advance
+0FA7  E4                  1980  	CLR	A		Zero offset
+0FA8  93                  1981  	MOVC	A,[A+DPTR]	Get next char
+0FA9  80 ED               1982  	SJMP	?AC4		And proceed
+0FAB                      1983  * Test for the various special characters
+0FAB  E4                  1984  ?AC5	CLR	A		Zero offset
+0FAC  93                  1985  	MOVC	A,[A+DPTR]	Get char back
+0FAD                      1986  * 'd' - decimal number
+0FAD  B4 64 13            1987  	CJNE	A,#'d',?AC7	No, try next
+0FB0  E6                  1988  	MOV	A,[R0]		Get LOW value
+0FB1  08                  1989  	INC	R0		Advance
+0FB2  86 F0               1990  	MOV	B,[R0]		Get HIGH value
+0FB4  30 F7 08            1991  	JNB	B.7,?AC6		Not negative
+0FB7  43 07 20            1992  	ORL	?R7,#%00100000	Set '-' output flag
+0FBA  12 12 B4            1993  	LCALL	?neg		Negate it
+0FBD  A6 F0               1994  	MOV	[R0],B		Resave LOW
+0FBF  18                  1995  ?AC6	DEC	R0		Advance
+0FC0  F6                  1996  	MOV	[R0],A		Resave LOW
+0FC1  80 03               1997  	SJMP	?AC8		And proceed
+0FC3                      1998  * 'u' - Unsigned number
+0FC3  B4 75 05            1999  ?AC7	CJNE	A,#'u',?AC9	No, try next
+0FC6  43 07 0A            2000  ?AC8	ORL	?R7,#10		Indicate base 10 number
+0FC9  80 1C               2001  	SJMP	?AC14		And proceed
+0FCB                      2002  * 'x' - Hexidecimal number
+0FCB  B4 78 05            2003  ?AC9	CJNE	A,#'x',?AC10	No, try next
+0FCE  43 07 10            2004  	ORL	?R7,#16		Indicate base 16 number
+0FD1  80 14               2005  	SJMP	?AC14
+0FD3                      2006  * 'o' - Octal number
+0FD3  B4 6F 0B            2007  ?AC10	CJNE	A,#'o',?AC13	No, try next
+0FD6  43 07 08            2008  	ORL	?R7,#8		Indicate base 8	number
+0FD9  80 0C               2009  	SJMP	?AC14
+0FDB                      2010  * Nothing special, write the character out
+0FDB  12 11 20            2011  ?AC11	LCALL	?putch		Write out char
+0FDE                      2012  * Swap back to format string, advance & process next char
+0FDE  A3                  2013  ?AC12	INC	DPTR		Skip to next char
+0FDF  80 9B               2014  	SJMP	?AC1		Back for next
+0FE1                      2015  * 'b' - Binary number
+0FE1  B4 62 62            2016  ?AC13	CJNE	A,#'b',?AC22	No, try next
+0FE4  43 07 02            2017  	ORL	?R7,#2		Indicate base 2 number
+0FE7                      2018  * Convert numbers into string (on stack)
+0FE7  7A 00               2019  ?AC14	MOV	R2,#0		Count of digits
+0FE9  C0 04               2020  ?AC15	PUSH	?R4		Save R4
+0FEB  C0 05               2021  	PUSH	?R5		Save R5
+0FED  C0 06               2022  	PUSH	?R6		Save R6
+0FEF  C0 07               2023  	PUSH	?R7		Save R7
+0FF1  AB 07               2024  	MOV	R3,?R7		Get flags
+0FF3  53 03 1F            2025  	ANL	?R3,#%00011111	Save only number base
+0FF6  7C 00               2026  	MOV	R4,#0		Zero high
+0FF8  E6                  2027  	MOV	A,[R0]		Get LOW value
+0FF9  08                  2028  	INC	R0		Advance
+0FFA  86 F0               2029  	MOV	B,[R0]		Get HIGH value
+0FFC  12 12 52            2030  	LCALL	?div		Perform division
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 36
+
+0FFF  A6 F0               2031  	MOV	[R0],B		Save HIGH
+1001  18                  2032  	DEC	R0		Backup
+1002  F6                  2033  	MOV	[R0],A		Save LOW
+1003  ED                  2034  	MOV	A,R5		Get remainder
+1004  D0 07               2035  	POP	?R7		Restore R7
+1006  D0 06               2036  	POP	?R6		Restore R6
+1008  D0 05               2037  	POP	?R5		Restore R5
+100A  D0 04               2038  	POP	?R4		Restore R4
+100C  24 30               2039  	ADD	A,#'0'		Convert to ASCII
+100E  B4 3A 00            2040  	CJNE	A,#$3A,*+3	Hex digit?
+1011  40 02               2041  	JC	?AC16		No, its OK
+1013  24 07               2042  	ADD	A,#7		Convert to ALPHANUMERIC
+1015  C0 E0               2043  ?AC16	PUSH	A		Save it
+1017  0A                  2044  	INC	R2		Advance count
+1018  E6                  2045  	MOV	A,[R0]		Get result
+1019  45 F0               2046  	ORL	A,B		More digits?
+101B  70 CC               2047  	JNZ	?AC15		Yes, do them
+101D  A9 02               2048  	MOV	R1,?R2		Save length for unstack
+101F                      2049  * If number was negative, output '-'
+101F  EF                  2050  	MOV	A,R7		Get flags
+1020  30 E5 06            2051  	JNB	A.5,?AC17		Not minus
+1023  74 2D               2052  	MOV	A,#'-'		Get minus sign
+1025  12 11 20            2053  	LCALL	?putch		Output character
+1028  0A                  2054  	INC	R2		Advance size (for pad)
+1029                      2055  * Unstack the number into the output buffer
+1029  12 10 A7            2056  ?AC17	LCALL	?AC35		Pad the field
+102C  D0 E0               2057  ?AC18	POP	A		Get char
+102E  12 11 20            2058  	LCALL	?putch		Write it out
+1031  D9 F9               2059  	DJNZ	R1,?AC18		Do them all
+1033                      2060  * If Left justify, pad with spaces
+1033  08                  2061  ?AC19	INC	R0		Advance pointer
+1034  08                  2062  	INC	R0		To next stack variable
+1035  EF                  2063  ?AC20	MOV	A,R7		Get flags
+1036  30 E7 A5            2064  	JNB	A.7,?AC12		No left justify
+1039  EA                  2065  ?AC21	MOV	A,R2		Get width
+103A  C3                  2066  	CLR	C		Insure no borrow
+103B  9E                  2067  	SUBB	A,R6		Calculate remainding
+103C  50 A0               2068  	JNC	?AC12		Already there
+103E  74 20               2069  	MOV	A,#' '		Get output
+1040  12 11 20            2070  	LCALL	?putch		Write it out
+1043  0A                  2071  	INC	R2		Advance size
+1044  80 F3               2072  	SJMP	?AC21		Do them all
+1046                      2073  * 'c' - Single character
+1046  B4 63 0B            2074  ?AC22	CJNE	A,#'c',?AC24	No, try next
+1049  AA 01               2075  	MOV	R2,1		Length is one
+104B  12 10 A7            2076  	LCALL	?AC35		Right justify
+104E  E6                  2077  	MOV	A,[R0]		Get value
+104F  12 11 20            2078  ?AC23	LCALL	?putch		Write it out
+1052  80 DF               2079  	SJMP	?AC19		Output
+1054                      2080  * 's' - External string
+1054  B4 73 2B            2081  ?AC24	CJNE	A,#'s',?AC29	No, try next
+1057  C0 82               2082  	PUSH	DPL		Save format LOW
+1059  C0 83               2083  	PUSH	DPH		Save format HIGH
+105B  86 82               2084  	MOV	DPL,[R0]	Get string LOW
+105D  08                  2085  	INC	R0		Advance
+105E  86 83               2086  	MOV	DPH,[R0]	Get string HIGH
+1060  7A 00               2087  	MOV	R2,#0		Assume zero length
+1062  E4                  2088  ?AC25	CLR	A		Zero offset
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 37
+
+1063  93                  2089  	MOVC	A,[A+DPTR]	Get char
+1064  60 04               2090  	JZ	?AC26		And proceed
+1066  A3                  2091  	INC	DPTR		Advance string
+1067  0A                  2092  	INC	R2		Advance count
+1068  80 F8               2093  	SJMP	?AC25		Do till done
+106A  86 83               2094  ?AC26	MOV	DPH,[R0]	Get HIGH string
+106C  18                  2095  	DEC	R0		Backup
+106D  86 82               2096  	MOV	DPL,[R0]	Get LOW string
+106F  12 10 A7            2097  	LCALL	?AC35		Right justify
+1072  E4                  2098  ?AC27	CLR	A		Zero offset
+1073  93                  2099  	MOVC	A,[A+DPTR]	Get a char
+1074  A3                  2100  	INC	DPTR		Advance
+1075  60 05               2101  	JZ	?AC28		And proceed
+1077  12 11 20            2102  	LCALL	?putch		Write to output
+107A  80 F6               2103  	SJMP	?AC27		Do them all
+107C  D0 83               2104  ?AC28	POP	DPH		Restore HIGH format
+107E  D0 82               2105  	POP	DPL		Restore LOW format
+1080  80 B1               2106  	SJMP	?AC19		And proceed
+1082                      2107  * 'i' - Internal string
+1082  B4 69 19            2108  ?AC29	CJNE	A,#'i',?AC33	No, try next
+1085  86 01               2109  	MOV	?R1,[R0]	Get string address
+1087  7A 00               2110  	MOV	R2,#0		Assume zero length
+1089  E7                  2111  ?AC30	MOV	A,[R1]		Get char
+108A  60 04               2112  	JZ	?AC31		End of string
+108C  09                  2113  	INC	R1		Advance string
+108D  0A                  2114  	INC	R2		Advance count
+108E  80 F9               2115  	SJMP	?AC30		Do them all
+1090  12 10 A7            2116  ?AC31	LCALL	?AC35		Right justify
+1093  86 01               2117  	MOV	?R1,[R0]	Reset string
+1095  E7                  2118  ?AC32	MOV	A,[R1]		Get string
+1096  60 9B               2119  	JZ	?AC19		End of string
+1098  12 11 20            2120  	LCALL	?putch		Write to output
+109B  09                  2121  	INC	R1		Advance string
+109C  80 F7               2122  	SJMP	?AC32		Do it all
+109E                      2123  * Unknown, just output this character
+109E  F9                  2124  ?AC33	MOV	R1,A		Save it
+109F  7A 01               2125  	MOV	R2,#1		Single
+10A1  12 10 A7            2126  	LCALL	?AC35		Right justify
+10A4  E9                  2127  	MOV	A,R1		Get back
+10A5  80 A8               2128  	SJMP	?AC23		Write & continue
+10A7                      2129  *
+10A7                      2130  * Pad the input field with the proper character
+10A7                      2131  *
+10A7  EE                  2132  ?AC35	MOV	A,R6		Get width
+10A8  60 1B               2133  	JZ	?AC38		No justification
+10AA  8F F0               2134  	MOV	B,R7		Get pad value
+10AC  20 F7 16            2135  	JB	B.7,?AC38		Left justify, do nothing
+10AF  C0 02               2136  	PUSH	?R2		Save R2
+10B1  EA                  2137  ?AC36	MOV	A,R2		Get width
+10B2  C3                  2138  	CLR	C		Insure no borrow
+10B3  9E                  2139  	SUBB	A,R6		Compare against limit
+10B4  50 0D               2140  	JNC	?AC37		We are already there
+10B6  74 20               2141  	MOV	A,#' '		Assume space
+10B8  30 F6 02            2142  	JNB	B.6,*+5		Assumption correct
+10BB  74 30               2143  	MOV	A,#'0'		Get leading zeros
+10BD  12 11 20            2144  	LCALL	?putch		Write to output
+10C0  0A                  2145  	INC	R2		Advance count
+10C1  80 EE               2146  	SJMP	?AC36		do them all
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 38
+
+10C3  D0 02               2147  ?AC37	POP	?R2		Restore R2
+10C5  22                  2148  ?AC38	RET
+10C6                      2149  *02771
+10C6                      2150  * Generate a delay via software timing loop
+10C6                      2151  * R1 count is calculated as: (crystal-72000)/48000
+10C6  78 FB               2152  delay	MOV	R0,#-5		Address of parm
+10C8  12 11 DA            2153  	LCALL	?auto0		Point to it
+10CB  86 03               2154  	MOV	?R3,[R0]	Get LOW count
+10CD  08                  2155  	INC	R0		Advnce to next
+10CE  86 04               2156  	MOV	?R4,[R0]	Get HIGH count
+10D0  BB 00 04            2157  ?AD1	CJNE	R3,#0,?AD2	2: Not zero
+10D3  BC 00 01            2158  	CJNE	R4,#0,?AD2	2: Not zero
+10D6  22                  2159  	RET
+10D7  79 E5               2160  ?AD2	MOV	R1,#229		1: 1ms at 11059200Hz
+10D9  A3                  2161  ?AD3	INC	DPTR		2: Waste 2 cycles
+10DA  D9 FD               2162  	DJNZ	R1,?AD3		2: Loop for 1-ms
+10DC  1B                  2163  	DEC	R3		1: Reduce count
+10DD  BB FF F0            2164  	CJNE	R3,#-1,?AD1	2: No carry
+10E0  1C                  2165  	DEC	R4		1: Reduce high
+10E1  80 F4               2166  	SJMP	?AD2		2: And proceed
+10E3                      2167  *02771
+10E3                      2168  * Set up the serial port: serinit(speed)
+10E3  78 FB               2169  serinit	MOV	R0,#-5		Point to first parm
+10E5  12 11 DA            2170  	LCALL	?auto0		Point to it
+10E8  86 03               2171  	MOV	?R3,[R0]	Get LOW value
+10EA  08                  2172  	INC	R0		Advance
+10EB  86 04               2173  	MOV	?R4,[R0]	Get HIGH value
+10ED                      2174  * Modify this constant for correct operation at different CPU clocks
+10ED                      2175  * Value is calculated as the CPU CRYSTAL (in Hz) divided by 384.
+10ED  74 80               2176  	MOV	A,#28800	Get LOW conversion factor
+10EF  75 F0 70            2177  	MOV	B,#=28800	Get HIGH conversion factor
+10F2  12 12 52            2178  	LCALL	?div		Calculate timer value
+10F5  12 12 B4            2179  	LCALL	?neg		Convert to count-up value
+10F8  75 89 21            2180          MOV     TMOD,#%00100001 T1=8 bit auto-reload
+10FB  F5 8D               2181  	MOV	TH1,A		Timer 1 reload value
+10FD  F5 8B               2182  	MOV	TL1,A		Timer 1 initial value
+10FF  75 88 59            2183          MOV     TCON,#%01011001 Run 1, Run 0
+1102  75 98 52            2184  	MOV	SCON,#%01010010	Mode 1, REN, TXRDY, RXEMPTY
+1105  22                  2185  	RET
+1106                      2186  *02771
+1106                      2187  *
+1106                      2188  * Low level I/O functions to communicate with the console terminal
+1106                      2189  *
+1106                      2190  * Write a string to the console: putstr(char *string)
+1106  78 FB               2191  putstr	MOV	R0,#-5		Offset to parameter
+1108  12 11 DA            2192  	LCALL	?auto0		Set up address
+110B  86 82               2193  	MOV	DPL,[R0]	Get low byte
+110D  08                  2194  	INC	R0		Step to next
+110E  86 83               2195  	MOV	DPH,[R0]	Get high byte
+1110  E4                  2196  ?putstr	CLR	A		Zero OFFSET
+1111  93                  2197  	MOVC	A,[A+DPTR]	Get char
+1112  60 2D               2198  	JZ	?AF2		End of string, return
+1114  12 11 20            2199  	LCALL	?putch		Output (with NEWLINE translation)
+1117  A3                  2200  	INC	DPTR		Advance to next char
+1118  80 F6               2201  	SJMP	?putstr		And continue
+111A                      2202  * Write a character to the console: putch(char c)
+111A  78 FB               2203  putch	MOV	R0,#-5		Offset to parameter
+111C  12 11 DA            2204  	LCALL	?auto0		Set up address
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 39
+
+111F  E6                  2205  	MOV	A,[R0]		Get char to write
+1120  30 99 FD            2206  ?putch	JNB	SCON.1,*	Wait for the bit
+1123  C2 99               2207  	CLR	SCON.1		Indicte we are sending
+1125  F5 99               2208  	MOV	SBUF,A		Write out char
+1127  B4 0A 17            2209  	CJNE	A,#$0A,?AF2	Not NEWLINE
+112A  74 0D               2210  	MOV	A,#$0D		Get CR
+112C  80 F2               2211  	SJMP	?putch		And go again
+112E                      2212  * Check for a character from the console: int chkch()
+112E  E4                  2213  chkch	CLR	A		Assume zero
+112F  30 98 0C            2214  	JNB	SCON.0,?AF1	No data ready
+1132                      2215  * Get a character from the console: int getch()
+1132  30 98 FD            2216  getch	JNB	SCON.0,*	Wait for the bit
+1135  C2 98               2217  	CLR	SCON.0		Indicate we receved it
+1137  E5 99               2218  	MOV	A,SBUF		Read the data
+1139  B4 0D 02            2219  	CJNE	A,#$0D,?AF1	Not CR, its OK
+113C  74 0A               2220  	MOV	A,#$0A		Convert to NEWLINE
+113E  75 F0 00            2221  ?AF1	MOV	B,#0		Zero high byte
+1141  22                  2222  ?AF2	RET
+1142                      2223  *02771
+1142                      2224  *
+1142                      2225  * Low level "raw" I/O functions to communicate with the console terminal
+1142                      2226  *
+1142                      2227  * Write a character to the console: putchr(char c)
+1142  78 FB               2228  putchr	MOV	R0,#-5		Offset to parameter
+1144  12 11 DA            2229  	LCALL	?auto0		Set up address
+1147  E6                  2230  	MOV	A,[R0]		Get char to write
+1148  30 99 FD            2231  	JNB	SCON.1,*	Wait for the bit
+114B  C2 99               2232  	CLR	SCON.1		Indicte we are sending
+114D  F5 99               2233  	MOV	SBUF,A		Write out char
+114F  22                  2234  	RET
+1150                      2235  * Check for a character from the console: int chkchr()
+1150  74 FF               2236  chkchr	MOV	A,#-1		Get -1
+1152  F5 F0               2237  	MOV	B,A		Copy for 16 bit value
+1154  30 98 0A            2238  	JNB	SCON.0,?AG1	No data ready
+1157                      2239  * Get a character from the console: int getchr()
+1157  30 98 FD            2240  getchr	JNB	SCON.0,*	Wait for the bit
+115A  C2 98               2241  	CLR	SCON.0		Indicate we receved it
+115C  E5 99               2242  	MOV	A,SBUF		Read the data
+115E  75 F0 00            2243  	MOV	B,#0		Zero high byte
+1161  22                  2244  ?AG1	RET
+1162                      2245  *02771
+1162                      2246  * Convert ASCII string to number: int _atoi(string)
+1162  78 FB               2247  _atoi	MOV	R0,#-5		Argument address
+1164  12 11 DA            2248  	LCALL	?auto0		Point to it
+1167  86 01               2249  	MOV	?R1,[R0]	Get pointer
+1169  E4                  2250  	CLR	A		Get ZERO
+116A  FB                  2251  	MOV	R3,A		Set LOW
+116B  FC                  2252  	MOV	R4,A		Set HIGH
+116C  FF                  2253  	MOV	R7,A		Assume positive
+116D  E7                  2254  ?AH1	MOV	A,[R1]		Get char
+116E  09                  2255  	INC	R1		Advance
+116F  B4 2D 03            2256  	CJNE	A,#'-',?AH3	Not minus
+1172  0F                  2257  	INC	R7		Set negative flag
+1173  E7                  2258  ?AH2	MOV	A,[R1]		Get char
+1174  09                  2259  	INC	R1		Advance
+1175  C3                  2260  ?AH3	CLR	C		Insure no carry
+1176  94 30               2261  	SUBB	A,#'0'		Convert to binary
+1178  B4 0A 00            2262  	CJNE	A,#10,*+3	Non-destructive compare
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 40
+
+117B  50 12               2263  	JNC	?AH4		End of number
+117D  FA                  2264  	MOV	R2,A		Save for later
+117E  74 0A               2265  	MOV	A,#10		*10
+1180  75 F0 00            2266  	MOV	B,#0		Zero high
+1183  12 12 3E            2267  	LCALL	?mul		Multiply result
+1186  2A                  2268  	ADD	A,R2		Include digit
+1187  FB                  2269  	MOV	R3,A		Save LOW
+1188  E5 F0               2270  	MOV	A,B		Swap
+118A  34 00               2271  	ADDC	A,#0		Insure high incs
+118C  FC                  2272  	MOV	R4,A		Save high
+118D  80 E4               2273  	SJMP	?AH2		And go again
+118F  EB                  2274  ?AH4	MOV	A,R3		Get LOW result
+1190  8C F0               2275  	MOV	B,R4		Get HIGH result
+1192  DF 03               2276  	DJNZ	R7,?AH5		Negative sign?
+1194  02 12 B4            2277  	LJMP	?neg		Yes, convert
+1197  22                  2278  ?AH5	RET
+1198                      2279  *02771
+1198                      2280  * Get a string (with editing): _getstr(register string, size)
+1198  78 FB               2281  _getstr	MOV	R0,#-5		Address of parm
+119A  12 11 DA            2282  	LCALL	?auto0		Address it
+119D  86 04               2283  	MOV	?R4,[R0]	Get size
+119F  18                  2284  	DEC	R0		Backup
+11A0  18                  2285  	DEC	R0		Backup
+11A1  86 01               2286  	MOV	?R1,[R0]	Get LOW address
+11A3  E4                  2287  	CLR	A		Get zero
+11A4  FD                  2288  	MOV	R5,A		Zero count
+11A5                      2289  * Get next character from the buffer
+11A5  12 11 32            2290  ?AI1	LCALL	getch		Get character from console
+11A8  B4 08 02            2291  	CJNE	A,#$08,?AI2	Backspace?
+11AB  80 03               2292  	SJMP	?AI3		Same as DEL
+11AD  B4 7F 16            2293  ?AI2	CJNE	A,#$7F,?AI4	Delete?
+11B0                      2294  * Delete a character from the buffer
+11B0  ED                  2295  ?AI3	MOV	A,R5		Get LOW count
+11B1  60 F2               2296  	JZ	?AI1		Buffer empty, ignore
+11B3  1D                  2297  	DEC	R5		Decrement count
+11B4  74 08               2298  	MOV	A,#8		Backspace
+11B6  12 11 20            2299  	LCALL	?putch		Display it
+11B9  74 20               2300  	MOV	A,#' '		Wipe away old
+11BB  12 11 20            2301  	LCALL	?putch		Display it
+11BE  74 08               2302  	MOV	A,#8		Backspace again
+11C0  12 11 20            2303  	LCALL	?putch		Display it
+11C3  19                  2304  	DEC	R1		Backup
+11C4  80 DF               2305  	SJMP	?AI1		And go again
+11C6                      2306  * Data received, stash in buffer
+11C6  12 11 20            2307  ?AI4	LCALL	?putch		Echo the character
+11C9  F7                  2308  	MOV	[R1],A		Write to buffer
+11CA  24 F3               2309  	ADD	A,#-$0D		Carriage return?
+11CC  60 06               2310  	JZ	?AI5		Yes, exit
+11CE  09                  2311  	INC	R1		Advance pointer
+11CF  0D                  2312  	INC	R5		Advance count
+11D0  ED                  2313  	MOV	A,R5		Get length
+11D1  B5 04 D1            2314  	CJNE	A,?R4,?AI1	Go till it fills
+11D4                      2315  * Terminate the buffer & exit
+11D4  E4                  2316  ?AI5	CLR	A		Get ZERO
+11D5  F7                  2317  	MOV	[R1],A		Zero terminate string
+11D6  F5 F0               2318  	MOV	B,A		Zero high
+11D8  ED                  2319  	MOV	A,R5		Get size
+11D9  22                  2320  	RET
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 41
+
+11DA                      2321  *02771
+11DA                      2322  *
+11DA                      2323  * DDS MICRO-C/51 runtime support functions for ALL memory models
+11DA                      2324  *
+11DA                      2325  * Setup R0 to access the stack
+11DA  C8                  2326  ?auto0	XCH	A,R0		Save A, get parameter
+11DB  25 81               2327  	ADD	A,SP		Adjust for stack offset
+11DD  C8                  2328  	XCH	A,R0		And restore order
+11DE  22                  2329  nargs	RET
+11DF                      2330  * Setup R1 to access the stack
+11DF  C9                  2331  ?auto1	XCH	A,R1		Save A, get parmater
+11E0  25 81               2332  	ADD	A,SP		Adjust for stack offset
+11E2  C9                  2333  	XCH	A,R1		And restore order
+11E3  7A 00               2334  	MOV	R2,#0		Clear high of index
+11E5  22                  2335  	RET
+11E6                      2336  * Adjust the stack pointer by R7 bytes
+11E6  D0 83               2337  ?adjstk	POP	DPH		Get high byte of RET addr
+11E8  D0 82               2338  	POP	DPL		Get low byte of RET addr
+11EA  CF                  2339  	XCH	A,R7		Get adjust (and save A)
+11EB  25 81               2340  	ADD	A,SP		Adjust stack
+11ED  F5 81               2341  	MOV	SP,A		Set new value
+11EF  CF                  2342  	XCH	A,R7		Restore A (& return new stack)
+11F0  C0 82               2343  	PUSH	DPL		Resave low
+11F2  C0 83               2344  	PUSH	DPH		Resave high
+11F4  22                  2345  	RET
+11F5                      2346  * Clean up stack & exit function
+11F5  CF                  2347  ?exit	XCH	A,R7		Get adjust (save A)
+11F6  25 81               2348  	ADD	A,SP		Adjust stack
+11F8  F5 81               2349  	MOV	SP,A		Resave
+11FA  CF                  2350  	XCH	A,R7		Restore A (& return new stack)
+11FB  22                  2351  	RET
+11FC                      2352  * Add accumulator to INDEX register
+11FC  29                  2353  ?addi	ADD	A,R1		Add low bytes
+11FD  F9                  2354  	MOV	R1,A		Resave
+11FE  E5 F0               2355  	MOV	A,B		Get high byte
+1200  3A                  2356  	ADDC	A,R2		Add hich bytes
+1201  FA                  2357  	MOV	R2,A		Resave
+1202  22                  2358  	RET
+1203                      2359  * Sign extend TEMP register
+1203  7C 00               2360  ?tsign	MOV	R4,#0		Assume positive
+1205  CB                  2361  	XCH	A,R3		Get low byte
+1206  30 E7 01            2362  	JNB	A.7,*+4		Its negative
+1209  1C                  2363  	DEC	R4		Convert to negative
+120A  CB                  2364  	XCH	A,R3		Put it back
+120B  22                  2365  	RET
+120C                      2366  * Sign extend A into B
+120C  75 F0 00            2367  ?sign	MOV	B,#0		Assume positive
+120F  30 E7 02            2368  	JNB	A.7,*+5		Assumption correct
+1212  15 F0               2369  	DEC	B		Convert to -1
+1214  22                  2370  	RET
+1215                      2371  *
+1215                      2372  * Perform a SWITCH statement
+1215                      2373  *
+1215  FD                  2374  ?switch	MOV	R5,A		Save low VALUE
+1216                      2375  * Examine this switch table entry
+1216  E4                  2376  ?swit1	CLR	A		Zero offset
+1217  93                  2377  	MOVC	A,[A+DPTR]	Get LOW byte of label
+1218  A3                  2378  	INC	DPTR		Advance to next
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 42
+
+1219  FE                  2379  	MOV	R6,A		Save for later
+121A  E4                  2380  	CLR	A		Zero offset
+121B  93                  2381  	MOVC	A,[A+DPTR]	Get HIGH of label
+121C  A3                  2382  	INC	DPTR		Advance to next
+121D  FF                  2383  	MOV	R7,A		Save for later
+121E  4E                  2384  	ORL	A,R6		At end of table?
+121F  70 09               2385  	JNZ	?swit2		No, keep looking
+1221                      2386  * End of table, jump to default label
+1221  E4                  2387  	CLR	A		Zero offset
+1222  93                  2388  	MOVC	A,[A+DPTR]	Get LOW label
+1223  FE                  2389  	MOV	R6,A		Set LOW destination
+1224  74 01               2390  	MOV	A,#1		Offset to next
+1226  93                  2391  	MOVC	A,[A+DPTR]	Get HIGH label
+1227  FF                  2392  	MOV	R7,A		Set HIGH destination
+1228  80 0B               2393  	SJMP	?swit3		And proceed
+122A                      2394  * Not end of table, check the value
+122A  E4                  2395  ?swit2	CLR	A		Offset to LOW value
+122B  93                  2396  	MOVC	A,[A+DPTR]	Get LOW byte of value
+122C  A3                  2397  	INC	DPTR		Advance to next
+122D  B5 05 0B            2398  	CJNE	A,?R5,?swit4	Doesn't match, skip
+1230  E4                  2399  	CLR	A		Zero offset
+1231  93                  2400  	MOVC	A,[A+DPTR]	Get HIGH byte of value
+1232  B5 F0 06            2401  	CJNE	A,B,?swit4	Doesn't match, skip
+1235                      2402  * Execute this routine
+1235  8F 83               2403  ?swit3	MOV	DPH,R7		Get HIGH label
+1237  8E 82               2404  	MOV	DPL,R6		Get LOW label
+1239  E4                  2405  ?idcall	CLR	A		Zero offset
+123A  73                  2406  	JMP	[A+DPTR]	Execute routine
+123B                      2407  * No match, loop and test next entry
+123B  A3                  2408  ?swit4	INC	DPTR		Skip HIGH value
+123C  80 D8               2409  	SJMP	?swit1		And keep looking
+123E                      2410  *
+123E                      2411  * 16 bit multiply of AB by R3-4, result in AB
+123E                      2412  *
+123E  FE                  2413  ?mul	MOV	R6,A		Save LO1
+123F  EB                  2414  	MOV	A,R3		Get LO2
+1240  A4                  2415  	MUL			Multiply HI1 * LO2
+1241  FD                  2416  	MOV	R5,A		Save partial product
+1242  8E F0               2417  	MOV	B,R6		Get LO1
+1244  EC                  2418  	MOV	A,R4		Get HI2
+1245  A4                  2419  	MUL			Multiply LO1 * HI2
+1246  FC                  2420  	MOV	R4,A		Save partial product
+1247  EB                  2421  	MOV	A,R3		Get LO2
+1248  8E F0               2422  	MOV	B,R6		Get LO1
+124A  A4                  2423  	MUL			Multiply LO2 * LO1
+124B  C5 F0               2424  	XCH	A,B		Save low & get high
+124D  2C                  2425  	ADD	A,R4		Add in carry from LO1 * HI2
+124E  2D                  2426  	ADD	A,R5		Add in carry from HI1 * LO2
+124F  C5 F0               2427  	XCH	A,B		Restore proper order
+1251  22                  2428  	RET
+1252                      2429  *
+1252                      2430  * 16 bit unsigned division of AB / R3-4
+1252                      2431  *
+1252  C0 02               2432  ?div	PUSH	?R2		Save index HIGH
+1254  C0 01               2433  	PUSH	?R1		Save index LOW
+1256  AA F0               2434  	MOV	R2,B		Save HI1
+1258  F9                  2435  	MOV	R1,A		Save LO1
+1259  7E 00               2436  	MOV 	R6,#0		Begin with zero
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 43
+
+125B  7D 00               2437  	MOV 	R5,#0		"" ""
+125D  7F 11               2438  	MOV	R7,#17		16+1 bit shift
+125F  C3                  2439  ?div1	CLR	C		No carry in
+1260  E9                  2440  ?div2	MOV	A,R1		Shift parm1 left, C = carry out
+1261  33                  2441  	RLC	A		Do the shift
+1262  F9                  2442  	MOV	R1,A		Resave
+1263  EA                  2443  	MOV	A,R2		Get high half
+1264  33                  2444  	RLC	A		Do the shift
+1265  FA                  2445  	MOV	R2,A		Resave
+1266  DF 08               2446  	DJNZ	R7,?div3	Not done, keep going
+1268                      2447  * Get result and exit
+1268  F5 F0               2448  	MOV	B,A		B = Quotient HIGH
+126A  E9                  2449  	MOV	A,R1		A = Quotient LOW
+126B  D0 01               2450  	POP	?R1		Restore index LOW
+126D  D0 02               2451  	POP	?R2		Restore index HIGH
+126F  22                  2452  	RET			And go home
+1270                      2453  * Compare registers & shift in appropriate bit
+1270  ED                  2454  ?div3	MOV	A,R5		Shift carry into secondary result
+1271  33                  2455  	RLC	A		Do the shift
+1272  FD                  2456  	MOV	R5,A		Resave
+1273  EE                  2457  	MOV	A,R6		Get high half
+1274  33                  2458  	RLC	A		Do the shift
+1275  FE                  2459  	MOV	R6,A		Resave
+1276  C3                  2460  	CLR	C		Clear carry for test
+1277  ED                  2461  	MOV	A,R5		Get secondary LOW
+1278  9B                  2462  	SUBB	A,R3		Test against primary LOW
+1279  F5 F0               2463  	MOV	B,A		Save for later store
+127B  EE                  2464  	MOV	A,R6		Get secondary HIGH
+127C  9C                  2465  	SUBB	A,R4		Test against primary high
+127D  40 E0               2466  	JC	?div1		Still smaller, shift in 0
+127F  AD F0               2467  	MOV	R5,B		Set new secondary high
+1281  FE                  2468  	MOV	R6,A		Set new secondary low
+1282  D3                  2469  	SETB	C		Set '1' in register
+1283  80 DB               2470  	SJMP	?div2		Shift in one
+1285                      2471  * Shift accumulator LEFT by R3
+1285  BB 00 01            2472  ?shl	CJNE	R3,#0,?shl1	Zero is special case
+1288  22                  2473  	RET			Perform no shift
+1289  C3                  2474  ?shl1	CLR	C		No shift in
+128A  33                  2475  	RLC	A		Shift low byte
+128B  C5 F0               2476  	XCH	A,B		Get high
+128D  33                  2477  	RLC	A		Shift high byte
+128E  C5 F0               2478  	XCH	A,B		Reorder ACC
+1290  DB F7               2479  	DJNZ	R3,?shl1	Repeat as necessary
+1292  22                  2480  	RET
+1293                      2481  * Shift accumulator RIGHT by R3
+1293  BB 00 01            2482  ?shr	CJNE	R3,#0,?shr1	Zero is special case
+1296  22                  2483  	RET			Perform no shift
+1297  C3                  2484  ?shr1	CLR	C		No shift in
+1298  C5 F0               2485  	XCH	A,B		Get high
+129A  13                  2486  	RRC	A		Shift high byte
+129B  C5 F0               2487  	XCH	A,B		Get low
+129D  13                  2488  	RRC	A		Shift low byte
+129E  DB F7               2489  	DJNZ	R3,?shr1	Repeat as necessary
+12A0  22                  2490  	RET
+12A1                      2491  * Increment the 16 bit accumulator by 2
+12A1  12 12 A4            2492  ?inc2	LCALL	?inc		Extra advance
+12A4                      2493  * Increment the 16 bit accumulator by 1
+12A4  04                  2494  ?inc	INC	A		Advance by 1
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 44
+
+12A5  70 02               2495  	JNZ	*+4		No Overflow
+12A7  05 F0               2496  	INC	B		Advance high
+12A9  22                  2497  	RET
+12AA                      2498  * Decrement the 16 bit accumulator by 2
+12AA  12 12 AD            2499  ?dec2	LCALL	?dec		Extra reduce
+12AD                      2500  * Decrement the 16 bit accumulator by 1
+12AD  14                  2501  ?dec	DEC	A		Reduce by 1
+12AE  B4 FF 02            2502  	CJNE	A,#$FF,*+5	No underflow
+12B1  15 F0               2503  	DEC	B		Reduce high
+12B3  22                  2504  	RET
+12B4                      2505  * Two's complement the 16 bit accumulator
+12B4  12 12 AD            2506  ?neg	LCALL	?dec		Decrement the accumulator
+12B7                      2507  * One's complement the 16 bit accumulator
+12B7  F4                  2508  ?com	CPL	A		Complement low byte
+12B8  C5 F0               2509  	XCH	A,B		Swap it
+12BA  F4                  2510  	CPL	A		Complement high byte
+12BB  C5 F0               2511  	XCH	A,B		Reorder
+12BD  22                  2512  	RET
+12BE                      2513  * Signed compares
+12BE  12 13 11            2514  ?lt	LCALL	?scomp		AB < R3-4 (signed)
+12C1  40 29               2515  	JC	?ret1
+12C3  80 1E               2516  	SJMP	?ret0
+12C5  12 13 11            2517  ?le	LCALL	?scomp		AB <= R3-4 (signed)
+12C8  40 22               2518  	JC	?ret1
+12CA  70 17               2519  	JNZ	?ret0
+12CC  80 1E               2520  	SJMP	?ret1
+12CE  12 13 11            2521  ?gt	LCALL	?scomp		AB > R3-4 (signed)
+12D1  40 10               2522  	JC	?ret0
+12D3  70 17               2523  	JNZ	?ret1
+12D5  80 0C               2524  	SJMP	?ret0
+12D7  12 13 11            2525  ?ge	LCALL	?scomp		AB >= R3-4 (signed)
+12DA  50 10               2526  	JNC	?ret1
+12DC  80 05               2527  	SJMP	?ret0
+12DE                      2528  * Equality compares
+12DE  12 13 25            2529  ?eq	LCALL	?ucomp		AB == R3-4
+12E1  60 09               2530  ?eq1	JZ	?ret1		They are the same
+12E3  E4                  2531  ?ret0	CLR	A		Get zero
+12E4  F5 F0               2532  	MOV	B,A		Set high
+12E6  22                  2533  	RET			Return logical ZERO
+12E7  12 13 25            2534  ?ne	LCALL	?ucomp		AB != R3-4
+12EA  60 F7               2535  	JZ	?ret0
+12EC  E4                  2536  ?ret1	CLR	A		Get zero
+12ED  F5 F0               2537  	MOV	B,A		Set high
+12EF  04                  2538  	INC	A		Convert to 1
+12F0  22                  2539  	RET			Return logical ONE
+12F1                      2540  * Unsigned compares
+12F1  12 13 25            2541  ?ult	LCALL	?ucomp		AB < R3-4 (unsigned)
+12F4  40 F6               2542  	JC	?ret1
+12F6  80 EB               2543  	SJMP	?ret0
+12F8  12 13 25            2544  ?ule	LCALL	?ucomp		AB <= R3-4 (unsigned)
+12FB  40 EF               2545  	JC	?ret1
+12FD  70 E4               2546  	JNZ	?ret0
+12FF  80 EB               2547  	SJMP	?ret1
+1301  12 13 25            2548  ?ugt	LCALL	?ucomp		AB > R3-4 (unsigned)
+1304  40 DD               2549  	JC	?ret0
+1306  70 E4               2550  	JNZ	?ret1
+1308  80 D9               2551  	SJMP	?ret0
+130A  12 13 25            2552  ?uge	LCALL	?ucomp		AB >= R3-4 (unsigned)
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 45
+
+130D  50 DD               2553  	JNC	?ret1
+130F  80 D2               2554  	SJMP	?ret0
+1311                      2555  * Signed compare of AB & R3-4
+1311  C3                  2556  ?scomp	CLR	C		Clear borrow
+1312  9B                  2557  	SUBB	A,R3		Calculate difference (low)
+1313  C5 F0               2558  	XCH	A,B		Get high
+1315  9C                  2559  	SUBB	A,R4		Calculate difference (high)
+1316  20 E7 07            2560  	JB	A.7,?sco2	Negative == <
+1319  20 D2 07            2561  	JB	PSW.2,?sco3	Overflow == <
+131C  C3                  2562  ?sco1	CLR	C		Indicate not less than
+131D  45 F0               2563  	ORL	A,B		Setup 'Z' if equal
+131F  22                  2564  	RET
+1320  20 D2 F9            2565  ?sco2	JB	PSW.2,?sco1	Negative & overflow == !<
+1323  D3                  2566  ?sco3	SETB	C		Indicate less than
+1324  22                  2567  	RET
+1325                      2568  * Unsigned compare of AB & R3-4
+1325  C5 F0               2569  ?ucomp	XCH	A,B		Get high
+1327  C3                  2570  	CLR	C		Zero high
+1328  9C                  2571  	SUBB	A,R4		Compare high
+1329  70 03               2572  	JNZ	*+5		Different
+132B  E5 F0               2573  	MOV	A,B		Get low
+132D  9B                  2574  	SUBB	A,R3		Compare low
+132E  22                  2575  ?ucomp1	RET
+132F                      2576  *02771
+132F                      2577  *
+132F                      2578  * DDS MICRO-C/51 runtime library support files for TINY model
+132F                      2579  *
+132F                      2580  * Load a byte from external memory into TEMP register
+132F  FB                  2581  ?extb	MOV	R3,A		Save A
+1330  E4                  2582  	CLR	A		Zero offset
+1331  93                  2583  	MOVC	A,[A+DPTR]	Get the byte
+1332  CB                  2584  	XCH	A,R3		Restore A, save result
+1333  22                  2585  	RET
+1334                      2586  * Load a word of external memory into TEMP register
+1334  FC                  2587  ?extw	MOV	R4,A		Save A
+1335  E4                  2588  	CLR	A		Zero offset
+1336  93                  2589  	MOVC	A,[A+DPTR]	Get the low order byte
+1337  FB                  2590  	MOV	R3,A		Save result LOW
+1338  74 01               2591  	MOV	A,#1		Offset to HIGH
+133A  93                  2592  	MOVC	A,[A+DPTR]	Get the high order byte
+133B  CC                  2593  	XCH	A,R4		Restore A, save result HIGH
+133C  22                  2594  	RET
+133D                      2595  * Load a word of external memory into INDEX register
+133D  FA                  2596  ?exti	MOV	R2,A		Save A
+133E  E4                  2597  	CLR	A		Zero offset
+133F  93                  2598  	MOVC	A,[A+DPTR]	Get the low order byte
+1340  F9                  2599  	MOV	R1,A		Save result LOW
+1341  74 01               2600  	MOV	A,#1		Offset to HIGH
+1343  93                  2601  	MOVC	A,[A+DPTR]	Get the high order byte
+1344  CA                  2602  	XCH	A,R2		Restore A, Save result HIGH
+1345  22                  2603  	RET
+1346                      2604  *#map1 Segment 1, initialized variables
+1346  0A 20 45 61 73 79 + 2605  title DB 10,32,69,97,115,121,45,68,111,119,110
+1351  6C 6F 61 64 65 72 + 2606   DB 108,111,97,100,101,114,32,86,53,46,48
+135C  20 66 6F 72 20 41 + 2607   DB 32,102,111,114,32,65,84,56,57,67,53
+1367  32 2F 38 39 53 35 + 2608   DB 50,47,56,57,83,53,50,32,70,108,97
+1372  73 68 46 6C 65 78 + 2609   DB 115,104,70,108,101,120,77,67,85,0
+137C  0A 20 3E 00         2610  prompt DB 10,32,62,0
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 46
+
+1380  0A 20 6F 6B 00      2611  ok DB 10,32,111,107,0
+1385  0A 77 61 74 69 6E + 2612  ?AB0 DB 10,119,97,116,105,110,103,32,104,101,120,32,102,105,108,101
+1395  00 0A 25 69 20 25 + 2613   DB 0,10,37,105,32,37,100,0,10,37,48,56,98,0,10,86
+13A5  50 50 20 3D 2B 31 + 2614   DB 80,80,32,61,43,49,50,86,0,10,112,114,101,115,115,32
+13B5  61 6E 79 20 6B 65 + 2615   DB 97,110,121,32,107,101,121,32,116,111,32,116,117,114,110,32
+13C5  56 50 50 20 6F 66 + 2616   DB 86,80,80,32,111,102,102,0,10,66,108,111,99,107,32,48
+13D5  20 6F 72 20 31 3E + 2617   DB 32,111,114,32,49,62,0,10,119,97,114,110,105,110,103,32
+13E5  21 20 66 75 72 74 + 2618   DB 33,32,102,117,114,116,104,101,114,32,112,114,111,103,114,97
+13F5  6D 6D 69 6E 67 20 + 2619   DB 109,109,105,110,103,32,119,105,108,108,32,98,101,32,100,105
+1405  73 61 62 6C 65 64 + 2620   DB 115,97,98,108,101,100,46,46,46,0,10,99,108,105,99,107
+1415  20 79 65 73 20 74 + 2621   DB 32,121,101,115,32,116,111,32,99,111,110,116,105,110,117,101
+1425  3E 00 0A 6C 6F 63 + 2622   DB 62,0,10,108,111,99,107,32,99,111,109,112,108,101,116,101
+1435  00 0A 61 62 6F 72 + 2623   DB 0,10,97,98,111,114,116,0,10,32,67,72,75,83,85,77
+1445  20 3D 20 25 30 34 + 2624   DB 32,61,32,37,48,52,120,0,37,120,0,10,102,111,117,110
+1455  64 20 53 53 54 38 + 2625   DB 100,32,83,83,84,56,57,69,53,49,82,68,0,10,102,111
+1465  75 6E 64 20 38 39 + 2626   DB 117,110,100,32,56,57,67,53,50,32,111,114,32,56,57,83
+1475  35 32 00 0A 20 6E + 2627   DB 53,50,0,10,32,110,111,110,98,108,97,110,107,32,37,117
+1485  20 62 79 74 65 73 + 2628   DB 32,98,121,116,101,115,0,10,32,98,121,116,101,115,32,99
+1495  6F 75 6E 74 65 72 + 2629   DB 111,117,110,116,101,114,32,37,117,0,10,116,97,114,103,101
+14A5  74 20 6E 6F 74 20 + 2630   DB 116,32,110,111,116,32,102,111,117,110,100,32,0,37,120,44
+14B5  25 75 2C 25 75 00 + 2631   DB 37,117,44,37,117,0,10,32,101,32,101,114,97,115,101,32
+14C5  62 6C 6F 63 6B 00 + 2632   DB 98,108,111,99,107,0,10,32,113,32,114,101,97,100,32,108
+14D5  6F 63 6B 20 62 69 + 2633   DB 111,99,107,32,98,105,116,0,10,32,115,32,115,101,116,32
+14E5  6E 75 6D 62 65 72 + 2634   DB 110,117,109,98,101,114,32,111,102,32,98,121,116,101,0,10
+14F5  20 72 20 72 65 61 + 2635   DB 32,114,32,114,101,97,100,32,99,111,100,101,0,10,32,108
+1505  20 6C 6F 63 6B 20 + 2636   DB 32,108,111,99,107,32,116,104,101,32,99,104,105,112,0,10
+1515  20 67 20 67 65 74 + 2637   DB 32,103,32,103,101,116,32,99,104,105,112,32,105,110,102,111
+1525  00 0A 20 77 20 77 + 2638   DB 0,10,32,119,32,119,114,105,116,101,32,98,121,116,101,0
+1535  0A 20 62 20 73 65 + 2639   DB 10,32,98,32,115,101,116,32,98,108,111,99,107,32,48,47
+1545  31 00               2640   DB 49,0
+1547                      2641  *#map2 Segment 2, internal "register" variables
+0008                      2642  	ORG	$0008		Internal ram ALWAYS starts here
+0008                      2643  
+0008                      2644  tick DS 1
+0009                      2645  i DS 2
+000B                      2646  ACCU DS 1
+000C                      2647  temp DS 1
+000D                      2648  blank DS 1
+000E                      2649  chip DS 1
+000F                      2650  VPP DS 1
+0010                      2651  ID DS 1
+0011                      2652  bcc DS 1
+0012                      2653  command DS 1
+0013                      2654  address DS 2
+0015                      2655  chksum DS 2
+0017                      2656  count DS 2
+0019                      2657  bytes DS 2
+001B                      2658  nonblank DS 2
+001D                      2659  load_address DS 2
+001F                      2660  buffer DS 50
+0051                      2661  eof DS 1
+0052                      2662  * Define the stack (at the end of segment 2)
+0052                      2663  ?stk	EQU	*		Stack goes at top of user variables
+0052                      2664  *02771
+0052                      2665  *
+0052                      2666  * Suffix file, define heap memory at the end of all pre-allocated storage.
+0052                      2667  *
+0052                      2668  ?heap	EQU	*		End of allocated memory
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 47
+
+0052                      2669  *02771
+DUNFIELD 8051 ASSEMBLER: C:\WINDOWS\TEMP\flex2                        PAGE: 48
+
+SYMBOL TABLE:
+
+?AB0    -1385   ?AB1    -00B5   ?AB10   -01B4   ?AB100  -0BEF   ?AB101  -0BFC
+?AB102  -0C09   ?AB103  -0C16   ?AB104  -0C23   ?AB105  -0C30   ?AB106  -0C3D
+?AB107  -0C98   ?AB108  -0CEC   ?AB109  -0CAB   ?AB11   -01B4   ?AB110  -0CBF
+?AB111  -0CAD   ?AB112  -0D0C   ?AB113  -0D01   ?AB114  -0DD7   ?AB115  -0D21
+?AB116  -0DC4   ?AB117  -0D37   ?AB118  -0D5A   ?AB119  -0D4A   ?AB12   -01E1
+?AB120  -0D7D   ?AB121  -0D6D   ?AB122  -0DD4   ?AB123  -0E3D   ?AB124  -0DEC
+?AB125  -0ED5   ?AB126  -0E52   ?AB127  -0EF1   ?AB128  -0F23   ?AB129  -0F08
+?AB13   -01CE   ?AB130  -0F20   ?AB131  -0F0A   ?AB132  -0F3A   ?AB133  -0F6C
+?AB134  -0F51   ?AB135  -0F69   ?AB136  -0F53   ?AB14   -01E5   ?AB15   -0203
+?AB16   -01FB   ?AB17   -0207   ?AB18   -025A   ?AB19   -0245   ?AB2    -00E8
+?AB20   -0267   ?AB21   -02B2   ?AB22   -027F   ?AB23   -0293   ?AB24   -0281
+?AB25   -02E9   ?AB26   -02E2   ?AB27   -031F   ?AB28   -0318   ?AB29   -032A
+?AB3    -0100   ?AB30   -05A2   ?AB31   -033F   ?AB32   -0353   ?AB33   -059F
+?AB34   -0367   ?AB35   -0512   ?AB36   -0595   ?AB37   -0525   ?AB38   -0539
+?AB39   -0527   ?AB4    -016B   ?AB40   -0602   ?AB41   -05B7   ?AB42   -0641
+?AB43   -0617   ?AB44   -065F   ?AB45   -0656   ?AB46   -06DD   ?AB47   -0676
+?AB48   -06B4   ?AB49   -06AD   ?AB5    -0118   ?AB50   -06B8   ?AB51   -079D
+?AB52   -06F4   ?AB53   -0748   ?AB54   -0707   ?AB55   -079A   ?AB56   -075B
+?AB57   -08CB   ?AB58   -07B2   ?AB59   -08CB   ?AB6    -0130   ?AB60   -07CE
+?AB61   -07D5   ?AB62   -080C   ?AB63   -08B6   ?AB64   -081F   ?AB65   -0833
+?AB66   -0821   ?AB67   -0869   ?AB68   -0860   ?AB69   -0883   ?AB7    -011A
+?AB70   -087C   ?AB71   -097E   ?AB72   -08E4   ?AB73   -090C   ?AB74   -097B
+?AB75   -0923   ?AB76   -093B   ?AB77   -0925   ?AB78   -09CC   ?AB79   -09BB
+?AB8    -019E   ?AB80   -09BB   ?AB81   -09BB   ?AB82   -09CC   ?AB83   -09CC
+?AB84   -09F5   ?AB85   -09E0   ?AB86   -0A07   ?AB87   -0A2F   ?AB88   -0A1B
+?AB89   -0B13   ?AB9    -0196   ?AB90   -0A44   ?AB91   -0B00   ?AB92   -0A7C
+?AB93   -0B10   ?AB94   -0B58   ?AB95   -0B28   ?AB96   -0BB0   ?AB97   -0B94
+?AB98   -0C6A   ?AB99   -0C4A   ?AC1    -0F7C   ?AC10   -0FD3   ?AC11   -0FDB
+?AC12   -0FDE   ?AC13   -0FE1   ?AC14   -0FE7   ?AC15   -0FE9   ?AC16   -1015
+?AC17   -1029   ?AC18   -102C   ?AC19   -1033   ?AC2    -0F83   ?AC20   -1035
+?AC21   -1039   ?AC22   -1046   ?AC23   -104F   ?AC24   -1054   ?AC25   -1062
+?AC26   -106A   ?AC27   -1072   ?AC28   -107C   ?AC29   -1082   ?AC3    -0F92
+?AC30   -1089   ?AC31   -1090   ?AC32   -1095   ?AC33   -109E   ?AC35   -10A7
+?AC36   -10B1   ?AC37   -10C3   ?AC38   -10C5   ?AC4    -0F98   ?AC5    -0FAB
+?AC6    -0FBF   ?AC7    -0FC3   ?AC8    -0FC6   ?AC9    -0FCB   ?AD1    -10D0
+?AD2    -10D7   ?AD3    -10D9   ?AF1    -113E   ?AF2    -1141   ?AG1    -1161
+?AH1    -116D   ?AH2    -1173   ?AH3    -1175   ?AH4    -118F   ?AH5    -1197
+?AI1    -11A5   ?AI2    -11AD   ?AI3    -11B0   ?AI4    -11C6   ?AI5    -11D4
+?R0     -0000   ?R1     -0001   ?R2     -0002   ?R3     -0003   ?R4     -0004
+?R5     -0005   ?R6     -0006   ?R7     -0007   ?addi   -11FC   ?adjstk -11E6
+?auto0  -11DA   ?auto1  -11DF   ?com    -12B7   ?dec    -12AD   ?dec2   -12AA
+?div    -1252   ?div1   -125F   ?div2   -1260   ?div3   -1270   ?eq     -12DE
+?eq1    -12E1   ?exit   -11F5   ?extb   -132F   ?exti   -133D   ?extw   -1334
+?ge     -12D7   ?gt     -12CE   ?heap   -0052   ?idcall -1239   ?inc    -12A4
+?inc2   -12A1   ?le     -12C5   ?lt     -12BE   ?mul    -123E   ?ne     -12E7
+?neg    -12B4   ?putch  -1120   ?putstr -1110   ?ret0   -12E3   ?ret1   -12EC
+?sco1   -131C   ?sco2   -1320   ?sco3   -1323   ?scomp  -1311   ?shl    -1285
+?shl1   -1289   ?shr    -1293   ?shr1   -1297   ?sign   -120C   ?stk    -0052
+?swit1  -1216   ?swit2  -122A   ?swit3  -1235   ?swit4  -123B   ?switch -1215
+?tsign  -1203   ?ucomp  -1325   ?ucomp1 -132E   ?uge    -130A   ?ugt    -1301
+?ule    -12F8   ?ult    -12F1   ACCU    -000B   ID      -0010
+PGMparameters           -0DD8   START   -0034   VPP     -000F   _atoi   -1162
+_getstr -1198   address -0013   bcc     -0011   blank   -000D   blanktest               -0A08
+block_select            -0660   buffer  -001F   bytes   -0019   chip    -000E
+chkXOFF -09AA   chkch   -112E   chkchr  -1150   chksum  -0015   command -0012
+count   -0017   delay   -10C6   delay100us              -0F28   delay10us               -0EDF
+eof     -0051   erase   -06E0   exit    -0043   get_record              -032B
+getch   -1132   getchr  -1157   getcommand              -01B9   getconsole              -01E6
+getinfo -0D0D   getnum  -00E9   gets    -025B   i       -0009
+load_address            -001D   lock    -0A30   main    -0055   manual_VPP              -0603
+nargs   -11DE   nonblank-001B   ok      -1380   printA  -0983   printchksum             -0B14
+printf  -0F71   printhelp               -0E3E   prompt  -137C   prompting               -0231
+pulseProg               -0ED6   putHEX  -09CD   putch   -111A   putchr  -1142
+putok   -0208   putstr  -1106   read    -08CC   readID  -0B59   read_ID -0642
+read_lockbit            -05A3   sendprompt              -021E   serinit -10E3
+servicetimer0           -0048   setcounter              -0CED   signature               -0BB1
+temp    -000C   testblank               -0BE1   tick    -0008   title   -1346
+to_hex  -02C4   write   -079E
